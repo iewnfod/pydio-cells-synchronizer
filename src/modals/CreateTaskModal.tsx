@@ -10,30 +10,30 @@ import {
     Stack
 } from "@mui/joy";
 import React, {useState} from "react";
-import {LARGE_PART, PAD, PAD2, SMALL_PART} from "../constants.ts";
+import {HOUR_UNIT, LARGE_PART, PAD, PAD2, SMALL_PART, UNITS} from "../constants.ts";
 import {open as selectLocal} from "@tauri-apps/api/dialog";
 import RemoteSelectModal, {getName} from "./RemoteSelectModal.tsx";
 import {BulkNode, Task} from "../interfaces.ts";
 import toast from "react-hot-toast";
 import {v1 as uuid1} from "uuid";
-import {UNITS} from "../Utils.ts";
 
 export default function CreateTaskModal({
     open,
     setOpen,
-    createTask
+    createTask,
 } : {
     open: boolean,
     setOpen: (open: boolean) => void,
-    createTask: (newTask: Task) => void
+    createTask: (newTask: Task) => void,
 }) {
     const [localPath, setLocalPath] = useState("");
-    const [remoteNode, setRemoteNode] = useState<BulkNode | undefined>(undefined);
+    const [remoteNode, setRemoteNode] =
+        useState<BulkNode | undefined>(undefined);
     const [ignores, setIgnores] = useState<string[]>([]);
     const [newIgnore, setNewIgnore] = useState("");
 
     const [interval, setInterval] = useState(1);
-    const [intervalUnit, setIntervalUnit] = useState(60 * 60);
+    const [intervalUnit, setIntervalUnit] = useState(HOUR_UNIT);
 
     const [remoteModalOpen, setRemoteModalOpen] = useState(false);
 
@@ -89,7 +89,8 @@ export default function CreateTaskModal({
             remoteDir: remoteNode,
             ignores: ignores,
             paused: false,
-            repeatInterval: interval * intervalUnit
+            repeatInterval: interval,
+            repeatIntervalUnit: intervalUnit
         };
 
         createTask(newTask);
@@ -206,7 +207,7 @@ export default function CreateTaskModal({
                                         <Select
                                             variant="plain"
                                             value={intervalUnit}
-                                            onChange={(_, value) => setIntervalUnit(value!)}
+                                            onChange={(_, value) => setIntervalUnit(value || intervalUnit)}
                                             slotProps={{
                                                 listbox: {
                                                     variant: 'outlined',
@@ -218,7 +219,7 @@ export default function CreateTaskModal({
                                                 UNITS.map((unit, index) => (
                                                     <Option
                                                         key={index}
-                                                        value={unit.level}
+                                                        value={unit}
                                                     >{unit.name}</Option>
                                                 ))
                                             }

@@ -21,27 +21,3 @@ export async function callBackend(name: string, args: any) {
         throw res.message;
     }
 }
-
-export const UNITS = [
-    {
-        name: 'minute',
-        level: 60
-    },
-    {
-        name: 'hour',
-        level: 60 * 60
-    },
-    {
-        name: 'day',
-        level: 60 * 60 * 24
-    }
-]
-
-export function loadTime(seconds: number) {
-    for (let i = 0; i <= UNITS.length; i++) {
-        if (UNITS[i].level >= seconds) {
-            return `${seconds/UNITS[i].level} ${UNITS[i].name}`;
-        }
-    }
-    return `${seconds} s`;
-}

@@ -1,4 +1,5 @@
 import {randomNum} from "./Utils.ts";
+import {TimeUnit} from "./interfaces.ts";
 
 export const ASPECT_RATIO = 1/0.618;
 export const SMALL_PART = 38.2;
@@ -22,3 +23,24 @@ export const TASKS_STORAGE_KEY = 'tasks';
 export function getValueFromStorage(key: string, defaultValue: any) {
     return localStorage.getItem(key) || defaultValue;
 }
+
+export const MINUTE_UNIT: TimeUnit = {
+    name: "minute",
+    level: 60
+}
+
+export const HOUR_UNIT: TimeUnit = {
+    name: "hour",
+    level: 60 * 60
+}
+
+export const DAY_UNIT: TimeUnit = {
+    name: "day",
+    level: 60 * 60 * 24
+}
+
+export const UNITS: TimeUnit[] = [
+    MINUTE_UNIT,
+    HOUR_UNIT,
+    DAY_UNIT
+]

@@ -22,7 +22,8 @@ export interface Task {
     ignores: string[],
     remoteDir: BulkNode,
     paused: boolean,
-    repeatInterval: number
+    repeatInterval: number,
+    repeatIntervalUnit: TimeUnit
 }
 
 export interface BulkNode {
@@ -37,4 +38,9 @@ export interface BulkMetaStore {
     ws_label: string,
     ws_syncable: boolean,
     name: string
+}
+
+export interface TimeUnit {
+    name: string,
+    level: number,
 }

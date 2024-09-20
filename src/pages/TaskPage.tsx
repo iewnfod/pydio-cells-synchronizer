@@ -3,14 +3,13 @@ import {DEFAULT_USER_DATA, Task, UserData} from "../interfaces.ts";
 import {useEffect, useState} from "react";
 import {getValueFromStorage, PAD, TASKS_STORAGE_KEY} from "../constants.ts";
 import LogoutIcon from '@mui/icons-material/Logout';
-import EditIcon from '@mui/icons-material/Edit';
-import PlayCircleIcon from '@mui/icons-material/PlayCircle';
-import PauseCircleIcon from '@mui/icons-material/PauseCircle';
 import AddIcon from '@mui/icons-material/Add';
 import CreateTaskModal from "../modals/CreateTaskModal.tsx";
 import {getName} from "../modals/RemoteSelectModal.tsx";
-import DeleteIcon from '@mui/icons-material/Delete';
-import {loadTime} from "../Utils.ts";
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import PauseIcon from '@mui/icons-material/Pause';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import EditTaskModalWithButton from "../modals/EditTaskModal.tsx";
 
 export default function TaskPage({
     userData,
@@ -59,8 +58,18 @@ export default function TaskPage({
 
     }
 
-    function handleEdit() {
-
+    function saveTask(newTask: Task) {
+        let index = -1;
+        for (let i = 0; i < tasks.length; i++) {
+            if (tasks[i].uuid === newTask.uuid) {
+                index = i;
+                break;
+            }
+        }
+        if (index === -1) return;
+        let newTasks = JSON.parse(JSON.stringify(tasks));
+        newTasks[index] = newTask;
+        setTasks(newTasks);
     }
 
     function handleDelete(task: Task) {
@@ -136,30 +145,32 @@ export default function TaskPage({
                                 </Box>
                             </td>
                             <td>
-                                {loadTime(task.repeatInterval)}
+                                {task.repeatInterval} {task.repeatIntervalUnit.name}
                             </td>
                             <td>
                                 <Box sx={{display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center'}}>
                                     <ButtonGroup
-                                        aria-label="outlined primary button group"
+                                        aria-label="radius primary button group"
+                                        sx={{ '--ButtonGroup-radius': '40px' }}
                                         size="sm"
                                     >
                                         {
                                             task.paused ? (
                                                 <IconButton onClick={() => handlePlay()}>
-                                                    <PlayCircleIcon/>
+                                                    <PlayArrowIcon/>
                                                 </IconButton>
                                             ) : (
                                                 <IconButton onClick={() => handlePause()}>
-                                                    <PauseCircleIcon/>
+                                                    <PauseIcon/>
                                                 </IconButton>
                                             )
                                         }
-                                        <IconButton onClick={() => handleEdit()}>
-                                            <EditIcon/>
-                                        </IconButton>
+                                        <EditTaskModalWithButton
+                                            task={task}
+                                            saveTask={saveTask}
+                                        />
                                         <IconButton onClick={() => handleDelete(task)}>
-                                            <DeleteIcon/>
+                                            <DeleteOutlineIcon/>
                                         </IconButton>
                                     </ButtonGroup>
                                 </Box>

@@ -161,7 +161,7 @@ export default function RemoteSelectModal({
                     <ButtonGroup
                         variant="soft"
                         aria-label="outlined primary button group"
-                        buttonFlex="0 1 200px"
+                        buttonFlex={`0 1 100%`}
                         sx={{ width: '100%', justifyContent: 'center' }}
                     >
                         <Button onClick={() => handleCancel()}>
