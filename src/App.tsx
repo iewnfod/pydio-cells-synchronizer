@@ -4,7 +4,7 @@ import {createBrowserRouter, RouterProvider} from "react-router-dom";
 import LoginPage from "./pages/LoginPage.tsx";
 import {
     BASE_URL_STORAGE_KEY,
-    getValueFromStorage,
+    getValueFromStorage, PASSWORD_STORAGE_KEY,
     PAT_STORAGE_KEY,
     URL_PREFIX_STORAGE_KEY, USER_DATA_STORAGE_KEY,
     USERNAME_STORAGE_KEY
@@ -18,6 +18,7 @@ function App() {
     const [baseUrl, _setBaseUrl] = useState(getValueFromStorage(BASE_URL_STORAGE_KEY, ""));
     const [urlPrefix, _setUrlPrefix] = useState(getValueFromStorage(URL_PREFIX_STORAGE_KEY, "https://"));
     const [pat, _setPat] = useState(getValueFromStorage(PAT_STORAGE_KEY, ""));
+    const [password, _setPassword] = useState(getValueFromStorage(PASSWORD_STORAGE_KEY, ""));
     const [fullUrl, setFullUrl] = useState<URL>(new URL(urlPrefix + baseUrl));
     const [username, _setUsername] = useState(getValueFromStorage(USERNAME_STORAGE_KEY, ""));
 
@@ -44,6 +45,11 @@ function App() {
         _setPat(pat);
     }
 
+    function setPassword(password: string) {
+        localStorage.setItem(PASSWORD_STORAGE_KEY, password);
+        _setPassword(password);
+    }
+
     function setUsername(username: string) {
         localStorage.setItem(USERNAME_STORAGE_KEY, username);
         _setUsername(username);
@@ -51,14 +57,20 @@ function App() {
 
     async function connect() {
         try {
-            let res = await callBackend("connect", {
+            let loginRes = await callBackend("login", {
                 endpoint: fullUrl.toString(),
                 username: username,
-                pat: pat
+                password: password
             });
-            if (res.success) {
-                setUserData(res.data);
-                return;
+            if (loginRes.success) {
+                let res = await callBackend("connect", {
+                    endpoint: fullUrl.toString(),
+                    username: username,
+                });
+                if (res.success) {
+                    setUserData(res.data);
+                    return;
+                }
             }
         } catch {
             console.log("Failed to connect to server");
@@ -76,8 +88,8 @@ function App() {
                 baseUrl={baseUrl}
                 setBaseUrl={setBaseUrl}
                 urlPrefix={urlPrefix}
-                pat={pat}
-                setPat={setPat}
+                password={password}
+                setPassword={setPassword}
                 uname={username}
                 setUname={setUsername}
                 connect={connect}
@@ -89,7 +101,7 @@ function App() {
             element: <TaskPage
                 userData={userData}
                 setUserData={setUserData}
-                setPat={setPat}
+                setPat={setPassword}
             />
         }
     ]);

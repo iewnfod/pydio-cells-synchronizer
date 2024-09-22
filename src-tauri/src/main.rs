@@ -37,7 +37,10 @@ fn main() {
     let app = tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             connect,
-            list
+            list,
+            login,
+            sync,
+            pause
         ])
         .build(tauri::generate_context!()).unwrap();
 

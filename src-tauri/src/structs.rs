@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -12,8 +14,8 @@ impl<T: Default+Serialize> CommandResponse<T> {
 	pub fn ok(data: T) -> Self {
 		Self { success: true, data, message: "".to_string() }
 	}
-	pub fn err(message: String) -> Self {
-		Self { success: false, data: T::default(), message }
+	pub fn err<S: ToString>(message: S) -> Self {
+		Self { success: false, data: T::default(), message: message.to_string() }
 	}
 }
 
@@ -44,7 +46,7 @@ pub struct BulkMetaData {
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct BulkNode {
     Uuid: String,
-	Path: String,
+	pub Path: String,
 	Type: String,
 	#[serde(default)]
 	ETag: String,
@@ -60,6 +62,43 @@ pub struct BulkMetaStore {
 	ws_syncable: String,
 	#[serde(default)]
 	name: String
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct SessionData {
+	pub JWT: String,
+	pub ExpireTime: usize,
+	pub Token: TokenData
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct TokenData {
+	pub AccessToken: String,
+	pub IDToken: String,
+	pub ExpiresAt: String
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SyncTask {
+	pub from: PathBuf,
+	pub to: String
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct TaskData {
+	pub uuid: String,
+	pub localDir: String,
+	pub ignores: Vec<String>,
+	pub remoteDir: BulkNode,
+	pub paused: bool,
+	pub repeatInterval: f64,
+	pub repeatIntervalUnit: TimeUnit
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct TimeUnit {
+	name: String,
+	level: f64
 }
 
 pub fn parse_json<'a, T: Default + Deserialize<'a>>(data: &'a str) -> T {

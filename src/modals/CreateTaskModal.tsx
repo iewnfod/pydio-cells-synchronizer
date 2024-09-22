@@ -1,7 +1,6 @@
 import {
-    Box,
     Button,
-    ButtonGroup, Chip, ChipDelete, DialogContent,
+    ButtonGroup, DialogContent,
     DialogTitle, Divider,
     FormControl,
     FormLabel, Input,
@@ -10,12 +9,13 @@ import {
     Stack
 } from "@mui/joy";
 import React, {useState} from "react";
-import {HOUR_UNIT, LARGE_PART, PAD, PAD2, SMALL_PART, UNITS} from "../constants.ts";
+import {HOUR_UNIT, LARGE_PART, PAD2, UNITS} from "../constants.ts";
 import {open as selectLocal} from "@tauri-apps/api/dialog";
 import RemoteSelectModal, {getName} from "./RemoteSelectModal.tsx";
 import {BulkNode, Task} from "../interfaces.ts";
 import toast from "react-hot-toast";
 import {v1 as uuid1} from "uuid";
+import IgnoresInput from "../components/IgnoresInput.tsx";
 
 export default function CreateTaskModal({
     open,
@@ -30,7 +30,6 @@ export default function CreateTaskModal({
     const [remoteNode, setRemoteNode] =
         useState<BulkNode | undefined>(undefined);
     const [ignores, setIgnores] = useState<string[]>([]);
-    const [newIgnore, setNewIgnore] = useState("");
 
     const [interval, setInterval] = useState(1);
     const [intervalUnit, setIntervalUnit] = useState(HOUR_UNIT);
@@ -50,23 +49,6 @@ export default function CreateTaskModal({
 
     function handleSelectRemote() {
         setRemoteModalOpen(true);
-    }
-
-    function handleDeleteIgnore(ignore: string) {
-        ignore = ignore.trim();
-        if (ignores.indexOf(ignore) !== -1) {
-            const newIgnores = JSON.parse(JSON.stringify(ignores));
-            newIgnores.splice(ignores.indexOf(ignore), 1);
-            setIgnores(newIgnores);
-        }
-    }
-
-    function handleAddIgnore() {
-        let ignore = newIgnore.trim();
-        if (ignore.length > 0 && ignores.indexOf(ignore) === -1) {
-            setIgnores([...ignores, ignore]);
-            setNewIgnore("");
-        }
     }
 
     function handleCreate() {
@@ -155,39 +137,7 @@ export default function CreateTaskModal({
                             <FormLabel>
                                 Ignore Files & Dirs
                             </FormLabel>
-                            <Box sx={{
-                                width: '100%', display: 'flex', flexDirection: 'row', flexGrow: 1,
-                                justifyContent: 'flex-start', alignItems: 'center',
-                                flexFlow: 'row wrap', gap: PAD
-                            }}>
-                                {
-                                    ignores.map((ignore, index) => (
-                                        <Chip
-                                            key={index}
-                                            endDecorator={
-                                                <ChipDelete onDelete={() => handleDeleteIgnore(ignore)}/>
-                                            }
-                                        >
-                                            {ignore}
-                                        </Chip>
-                                    ))
-                                }
-                                <form onSubmit={(e) => {
-                                    e.preventDefault();
-                                    handleAddIgnore();
-                                }} style={{flexGrow: 1, minWidth: `${SMALL_PART}%`}}>
-                                    <Input
-                                        sx={{width: '100%'}}
-                                        value={newIgnore}
-                                        onChange={(event) => setNewIgnore(event.target.value)}
-                                        endDecorator={
-                                            <Button variant="soft" color="neutral" type="submit">
-                                                Add
-                                            </Button>
-                                        }
-                                    />
-                                </form>
-                            </Box>
+                            <IgnoresInput ignores={ignores} setIgnores={setIgnores}/>
                         </FormControl>
                         <Divider/>
                         <FormControl>

@@ -1,7 +1,14 @@
-import {Box, Button, ButtonGroup, Chip, IconButton, Sheet, Table, Typography} from "@mui/joy";
+import {Box, Button, ButtonGroup, Chip, FormLabel, IconButton, Sheet, Table, Typography} from "@mui/joy";
 import {DEFAULT_USER_DATA, Task, UserData} from "../interfaces.ts";
 import {useEffect, useState} from "react";
-import {getValueFromStorage, PAD, TASKS_STORAGE_KEY} from "../constants.ts";
+import {
+    getValueFromStorage,
+    GLOABL_IGNORES_STORAGE_KEY,
+    LARGE_PART,
+    PAD,
+    SMALL_PART,
+    TASKS_STORAGE_KEY, TYPOGRAPHY_OVERFLOW_SX
+} from "../constants.ts";
 import LogoutIcon from '@mui/icons-material/Logout';
 import AddIcon from '@mui/icons-material/Add';
 import CreateTaskModal from "../modals/CreateTaskModal.tsx";
@@ -10,18 +17,23 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import PauseIcon from '@mui/icons-material/Pause';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import EditTaskModalWithButton from "../modals/EditTaskModal.tsx";
+import {callBackend} from "../Utils.ts";
+import IgnoresInput from "../components/IgnoresInput.tsx";
 
 export default function TaskPage({
     userData,
     setUserData,
-    setPat
+    setPassword
 } : {
     userData: UserData;
     setUserData: (userData: UserData) => void;
-    setPat: (pat: string) => void;
+    setPassword: (password: string) => void;
 }) {
     const [tasks, _setTasks] = useState<Task[]>(
         JSON.parse(getValueFromStorage(TASKS_STORAGE_KEY, "[]"))
+    );
+    const [globalIgnores, _setGlobalIgnores] = useState<string[]>(
+        JSON.parse(getValueFromStorage(GLOABL_IGNORES_STORAGE_KEY, "[]"))
     );
 
     const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -31,6 +43,11 @@ export default function TaskPage({
             window.location.href = '/';
         }
     }, [userData, setUserData]);
+
+    function setGlobalIgnores(ignores: string[]) {
+        localStorage.setItem(GLOABL_IGNORES_STORAGE_KEY, JSON.stringify(ignores));
+        _setGlobalIgnores(ignores);
+    }
 
     function setTasks(newTasks: Task[]) {
         localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(newTasks));
@@ -47,15 +64,37 @@ export default function TaskPage({
 
     function handleLogout() {
         setUserData(DEFAULT_USER_DATA);
-        setPat("");
+        setPassword("");
     }
 
-    function handlePlay() {
-
+    function handlePlay(task: Task) {
+        let newTask = {
+            ...task,
+            paused: false,
+        };
+        saveTask(newTask);
+        sync(newTask);
     }
 
-    function handlePause() {
+    function sync(task: Task) {
+        callBackend("sync", {
+            tasks: [task],
+            ignores: globalIgnores
+        }).then().catch();
+    }
 
+    function handlePause(task: Task) {
+        let newTask = {
+            ...task,
+            paused: true,
+        };
+        callBackend("pause", {
+            uuid: task.uuid,
+        }).then(() => {
+            saveTask(newTask);
+        }).catch(() => {
+            saveTask(newTask);
+        });
     }
 
     function saveTask(newTask: Task) {
@@ -81,7 +120,7 @@ export default function TaskPage({
     }
 
     return (
-        <Box sx={{height: '90vh', display: 'flex', flexDirection: 'column', gap: PAD}}>
+        <Box sx={{height: '90vh', display: 'flex', flexDirection: 'column', gap: PAD, overflow: 'hidden'}}>
             <Box sx={{
                 pl: PAD, pr: PAD, pb: PAD,
                 display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
@@ -102,10 +141,19 @@ export default function TaskPage({
                 </ButtonGroup>
             </Box>
             <Sheet>
-                <Table stickyHeader sx={{
-                    pl: PAD, pr: PAD, pb: PAD,
-                    '& tr > :last-child': { textAlign: 'right' }
+                <Box sx={{
+                    overflowY: 'auto', flex: 1,
+                    height: `${LARGE_PART + SMALL_PART / 2}vh`
                 }}>
+                <Table
+                    stickyHeader
+                    stickyFooter
+                    sx={{
+                        pl: PAD, pr: PAD, pb: PAD,
+                        '& tr > :last-child': { textAlign: 'right' },
+                        height: '100%'
+                    }}
+                >
                     <thead>
                     <tr>
                         <th>Local Dir</th>
@@ -118,16 +166,20 @@ export default function TaskPage({
                     <tbody>
                     {tasks.map((task: Task) => (
                         <tr key={task.uuid}>
-                            <td>{task.localDir}</td>
+                            <td>
+                                <Typography sx={TYPOGRAPHY_OVERFLOW_SX}>
+                                    {task.localDir}
+                                </Typography>
+                            </td>
                             <td>
                                 <Box sx={{
                                     display: 'flex', flexFlow: 'row wrap', justifyContent: 'flex-start', alignItems: 'center',
                                     gap: PAD/2, flexDirection: 'row'
                                 }}>
-                                    <Typography>
+                                    <Typography sx={TYPOGRAPHY_OVERFLOW_SX}>
                                         {getName(task.remoteDir)}
                                     </Typography>
-                                    <Typography>
+                                    <Typography sx={TYPOGRAPHY_OVERFLOW_SX}>
                                         ({task.remoteDir.Path})
                                     </Typography>
                                 </Box>
@@ -145,7 +197,9 @@ export default function TaskPage({
                                 </Box>
                             </td>
                             <td>
-                                {task.repeatInterval} {task.repeatIntervalUnit.name}
+                                <Typography sx={TYPOGRAPHY_OVERFLOW_SX}>
+                                    {task.repeatInterval} {task.repeatIntervalUnit.name}
+                                </Typography>
                             </td>
                             <td>
                                 <Box sx={{display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center'}}>
@@ -153,14 +207,15 @@ export default function TaskPage({
                                         aria-label="radius primary button group"
                                         sx={{ '--ButtonGroup-radius': '40px' }}
                                         size="sm"
+                                        orientation="vertical"
                                     >
                                         {
                                             task.paused ? (
-                                                <IconButton onClick={() => handlePlay()}>
+                                                <IconButton onClick={() => handlePlay(task)}>
                                                     <PlayArrowIcon/>
                                                 </IconButton>
                                             ) : (
-                                                <IconButton onClick={() => handlePause()}>
+                                                <IconButton onClick={() => handlePause(task)}>
                                                     <PauseIcon/>
                                                 </IconButton>
                                             )
@@ -178,7 +233,20 @@ export default function TaskPage({
                         </tr>
                     ))}
                     </tbody>
+                    <tfoot>
+                    <tr>
+                        <td colSpan={5} style={{textAlign: 'center'}}>
+                            <Box sx={{width: '100%', pb: PAD}}>
+                                <FormLabel sx={{p: PAD/2}}>
+                                    Global Ignore
+                                </FormLabel>
+                                <IgnoresInput ignores={globalIgnores} setIgnores={setGlobalIgnores}/>
+                            </Box>
+                        </td>
+                    </tr>
+                    </tfoot>
                 </Table>
+                </Box>
             </Sheet>
             <Box sx={{
                 width: '100%', height: '100%',

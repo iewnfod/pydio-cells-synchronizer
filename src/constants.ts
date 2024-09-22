@@ -16,9 +16,11 @@ export const BG_URL = `/bg/0${randomNum(1, 6)}.jpg`;
 export const BASE_URL_STORAGE_KEY = 'baseUrl';
 export const URL_PREFIX_STORAGE_KEY = 'urlPrefix';
 export const PAT_STORAGE_KEY = 'pat';
+export const PASSWORD_STORAGE_KEY = 'password';
 export const USERNAME_STORAGE_KEY = 'username';
 export const USER_DATA_STORAGE_KEY = 'userData';
 export const TASKS_STORAGE_KEY = 'tasks';
+export const GLOABL_IGNORES_STORAGE_KEY = 'ignores';
 
 export function getValueFromStorage(key: string, defaultValue: any) {
     return localStorage.getItem(key) || defaultValue;
@@ -43,4 +45,9 @@ export const UNITS: TimeUnit[] = [
     MINUTE_UNIT,
     HOUR_UNIT,
     DAY_UNIT
-]
+];
+
+export const TYPOGRAPHY_OVERFLOW_SX = {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis'
+}

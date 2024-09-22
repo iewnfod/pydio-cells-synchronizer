@@ -1,7 +1,6 @@
 import {
-    Box,
     Button,
-    ButtonGroup, Chip, ChipDelete, DialogContent,
+    ButtonGroup, DialogContent,
     DialogTitle, Divider,
     FormControl,
     FormLabel, IconButton, Input,
@@ -10,12 +9,13 @@ import {
     Stack
 } from "@mui/joy";
 import React, {useState} from "react";
-import {LARGE_PART, PAD, PAD2, SMALL_PART, UNITS} from "../constants.ts";
+import {LARGE_PART, PAD2, UNITS} from "../constants.ts";
 import {open as selectLocal} from "@tauri-apps/api/dialog";
 import RemoteSelectModal, {getName} from "./RemoteSelectModal.tsx";
 import {BulkNode, Task} from "../interfaces.ts";
 import EditIcon from "@mui/icons-material/Edit";
 import toast from "react-hot-toast";
+import IgnoresInput from "../components/IgnoresInput.tsx";
 
 export default function EditTaskModalWithButton({
     task,
@@ -30,7 +30,6 @@ export default function EditTaskModalWithButton({
     const [remoteNode, setRemoteNode] =
         useState<BulkNode | undefined>(task.remoteDir);
     const [ignores, setIgnores] = useState<string[]>(task.ignores);
-    const [newIgnore, setNewIgnore] = useState("");
 
     const [interval, setInterval] = useState(task.repeatInterval);
     const [intervalUnit, setIntervalUnit] = useState(task.repeatIntervalUnit);
@@ -50,23 +49,6 @@ export default function EditTaskModalWithButton({
 
     function handleSelectRemote() {
         setRemoteModalOpen(true);
-    }
-
-    function handleDeleteIgnore(ignore: string) {
-        ignore = ignore.trim();
-        if (ignores.indexOf(ignore) !== -1) {
-            const newIgnores = JSON.parse(JSON.stringify(ignores));
-            newIgnores.splice(ignores.indexOf(ignore), 1);
-            setIgnores(newIgnores);
-        }
-    }
-
-    function handleAddIgnore() {
-        let ignore = newIgnore.trim();
-        if (ignore.length > 0 && ignores.indexOf(ignore) === -1) {
-            setIgnores([...ignores, ignore]);
-            setNewIgnore("");
-        }
     }
 
     function handleSave() {
@@ -111,10 +93,10 @@ export default function EditTaskModalWithButton({
             >
                 <ModalDialog sx={{width: `${LARGE_PART}%`}}>
                     <DialogTitle>
-                        Create new task
+                        Edit the task
                     </DialogTitle>
                     <DialogContent>
-                        Fill in the information of the task.
+                        Change the information of the task.
                     </DialogContent>
                     <DialogContent>
                         <Stack spacing={PAD2}>
@@ -160,39 +142,7 @@ export default function EditTaskModalWithButton({
                                 <FormLabel>
                                     Ignore Files & Dirs
                                 </FormLabel>
-                                <Box sx={{
-                                    width: '100%', display: 'flex', flexDirection: 'row', flexGrow: 1,
-                                    justifyContent: 'flex-start', alignItems: 'center',
-                                    flexFlow: 'row wrap', gap: PAD
-                                }}>
-                                    {
-                                        ignores.map((ignore, index) => (
-                                            <Chip
-                                                key={index}
-                                                endDecorator={
-                                                    <ChipDelete onDelete={() => handleDeleteIgnore(ignore)}/>
-                                                }
-                                            >
-                                                {ignore}
-                                            </Chip>
-                                        ))
-                                    }
-                                    <form onSubmit={(e) => {
-                                        e.preventDefault();
-                                        handleAddIgnore();
-                                    }} style={{flexGrow: 1, minWidth: `${SMALL_PART}%`}}>
-                                        <Input
-                                            sx={{width: '100%'}}
-                                            value={newIgnore}
-                                            onChange={(event) => setNewIgnore(event.target.value)}
-                                            endDecorator={
-                                                <Button variant="soft" color="neutral" type="submit">
-                                                    Add
-                                                </Button>
-                                            }
-                                        />
-                                    </form>
-                                </Box>
+                                <IgnoresInput ignores={ignores} setIgnores={setIgnores}/>
                             </FormControl>
                             <Divider/>
                             <FormControl>
@@ -211,8 +161,8 @@ export default function EditTaskModalWithButton({
                                             <Divider orientation="vertical"/>
                                             <Select
                                                 variant="plain"
-                                                value={intervalUnit}
-                                                onChange={(_, value) => setIntervalUnit(value || intervalUnit)}
+                                                value={JSON.stringify(intervalUnit)}
+                                                onChange={(_, value) => setIntervalUnit(JSON.parse(value || JSON.stringify(intervalUnit)))}
                                                 slotProps={{
                                                     listbox: {
                                                         variant: 'outlined',
@@ -224,7 +174,7 @@ export default function EditTaskModalWithButton({
                                                     UNITS.map((unit, index) => (
                                                         <Option
                                                             key={index}
-                                                            value={unit}
+                                                            value={JSON.stringify(unit)}
                                                         >{unit.name}</Option>
                                                     ))
                                                 }

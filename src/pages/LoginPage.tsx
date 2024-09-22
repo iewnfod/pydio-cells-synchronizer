@@ -17,9 +17,9 @@ import {UserData} from "../interfaces.ts";
 
 export default function LoginPage({
     baseUrl,
-    pat,
+    password,
     setBaseUrl,
-    setPat,
+    setPassword,
     urlPrefix,
     uname,
     setUname,
@@ -27,9 +27,9 @@ export default function LoginPage({
     userData
 } : {
     baseUrl: string,
-    pat: string,
+    password: string,
     setBaseUrl: (baseUrl: string, urlPrefix: string) => void,
-    setPat: (pat: string) => void,
+    setPassword: (password: string) => void,
     urlPrefix: string,
     uname: string,
     setUname: (username: string) => void,
@@ -38,7 +38,7 @@ export default function LoginPage({
 }) {
     const [localBaseUrl, setLocalBaseUrl] = useState(baseUrl);
     const [localUrlPrefix, setLocalUrlPrefix] = useState(urlPrefix);
-    const [localPat, setLocalPat] = useState(pat);
+    const [localPassword, setLocalPassword] = useState(password);
     const [loading, setLoading] = useState(false);
     const [username, setUsername] = useState(uname);
 
@@ -59,14 +59,14 @@ export default function LoginPage({
             toast.error('Username should not be empty');
             return;
         }
-        if (localPat.length === 0) {
-            toast.error('Personal Access Token should not be empty');
+        if (localPassword.length === 0) {
+            toast.error('Password should not be empty');
             return;
         }
 
         setLoading(true);
         setBaseUrl(localBaseUrl, localUrlPrefix);
-        setPat(localPat);
+        setPassword(localPassword);
         setUname(username);
         connect().then(() => {
             setLoading(false);
@@ -128,10 +128,10 @@ export default function LoginPage({
                         onChange={(e) => setUsername(e.target.value.trim())}
                     />
                     <Input
-                        value={localPat}
-                        placeholder="Personal Access Token"
+                        value={localPassword}
+                        placeholder="Password"
                         type="password"
-                        onChange={(e) => setLocalPat(e.target.value.trim())}
+                        onChange={(e) => setLocalPassword(e.target.value.trim())}
                     />
                 </Box>
             </CardContent>
