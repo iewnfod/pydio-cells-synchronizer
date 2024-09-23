@@ -4,13 +4,18 @@ use aws_config::{AppName, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_s3::{config::{Credentials, SharedCredentialsProvider}, primitives::ByteStream, Client};
 use lazy_static::lazy_static;
 use serde_json::json;
+use surf::StatusCode;
 use tauri::async_runtime::JoinHandle;
 use walkdir::WalkDir;
 
-use crate::structs::{parse_json, BulkMetaData, BulkNode, CommandResponse, SessionData, SyncTask, TaskData, TaskProcess, UserData};
+use crate::{etag::calculate_etag, structs::{parse_json, BulkMetaData, BulkNode, CommandResponse, SessionData, SyncTask, TaskData, TaskProcess, UserData}};
+
+const BUCKET_NAME: &str = "io";
 
 static mut ENDPOINT: String = String::new();
 static mut USERNAME: String = String::new();
+static mut PASSWORD: String = String::new();
+
 lazy_static! {
 	pub static ref SESSION: Mutex<SessionData> = Mutex::new(SessionData::default());
 	pub static ref SYNC_HANDLERS: Mutex<Vec<(String, JoinHandle<()>)>> = Mutex::new(vec![]);
@@ -46,13 +51,10 @@ async fn post<T: ToString>(api: T, data: String) -> Result<surf::Response, surf:
 
 async fn post_without_bearer<T: ToString>(api: T, data: String) -> Result<surf::Response, surf::Error> {
 	println!("Posting {}{} without bearer with body: {}", get_endpoint(), api.to_string(), &data);
-	let res = surf::post(
-		format!("{}{}", &get_endpoint(), api.to_string())
-	)
-		.body(data)
-		.send().await;
 
-	res
+	surf::post(format!("{}{}", &get_endpoint(), api.to_string()))
+		.body(data)
+		.send().await
 }
 
 async fn get<T: ToString>(api: T) -> Result<surf::Response, surf::Error> {
@@ -118,6 +120,7 @@ pub async fn login(endpoint: String, username: String, password: String) -> Stri
 	unsafe {
 		ENDPOINT = endpoint.clone();
 		USERNAME = username.clone();
+		PASSWORD = password.clone();
 	}
 
 	let res = post_without_bearer(
@@ -224,6 +227,7 @@ async fn _sync(
 	let walk = WalkDir::new(&local_path);
 	let mut syncTasks: Vec<SyncTask> = vec![];
 
+	println!("Start to collect files for task {}", &uuid);
 	'walk_loop: for p in walk {
 		let p = p.unwrap();
 		if p.file_type().is_file() {
@@ -238,6 +242,32 @@ async fn _sync(
 			let partial_path = path.strip_prefix(&local_path).unwrap();
 			let partial_path_str = partial_path.as_os_str().to_str();
 			let s3_path = format!("{}/{}", &remote_path, partial_path_str.unwrap());
+
+			sleep(Duration::from_millis(50));
+
+			let this_node = post(
+				"/a/meta/bulk/get",
+				json!({
+					"NodePaths": [
+						&s3_path
+					]
+				}).to_string()
+			).await;
+
+			if let Ok(mut node) = this_node {
+				let t = node.body_string().await.unwrap();
+				let node_data: BulkMetaData = parse_json(&t);
+				if node_data.Nodes.len() > 0 {
+					let etag = calculate_etag(path);
+					if let Ok(tag) = etag {
+						if node_data.Nodes[0].Etag == tag {
+							println!("Skip {:?}", path);
+							continue 'walk_loop;
+						}
+					}
+				}
+			}
+
 			syncTasks.push(SyncTask { from: path.to_path_buf(), to: s3_path.clone() });
 		}
 	}
@@ -250,8 +280,9 @@ async fn _sync(
 		let body = ByteStream::from_path(&syncTask.from).await;
 		if body.is_ok() {
 			println!("Put {} to {}", &syncTask.from.to_str().unwrap(), &syncTask.to);
-			let res = s3_client.put_object()
-				.bucket("io")
+			let res = s3_client
+				.put_object()
+				.bucket(BUCKET_NAME)
 				.key(syncTask.to)
 				.body(body.unwrap())
 				.send()

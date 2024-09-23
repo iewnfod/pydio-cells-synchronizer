@@ -4,6 +4,7 @@
 
 mod net;
 mod structs;
+mod etag;
 
 use net::*;
 use tauri::{AppHandle, Manager, RunEvent, WindowEvent};

@@ -3399,9 +3399,12 @@ version = "0.1.0"
 dependencies = [
  "aws-config",
  "aws-sdk-s3",
+ "hex",
  "lazy_static",
+ "md-5",
  "serde",
  "serde_json",
+ "sha2 0.10.8",
  "surf",
  "tauri",
  "tauri-build",

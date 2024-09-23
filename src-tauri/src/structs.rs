@@ -40,7 +40,7 @@ pub struct AttributeData {
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct BulkMetaData {
-    Nodes: Vec<BulkNode>
+    pub Nodes: Vec<BulkNode>
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -49,7 +49,7 @@ pub struct BulkNode {
 	pub Path: String,
 	Type: String,
 	#[serde(default)]
-	ETag: String,
+	pub Etag: String,
 	#[serde(default)]
 	MetaStore: BulkMetaStore
 }
