@@ -1,4 +1,15 @@
-import {Box, Button, ButtonGroup, Chip, FormLabel, IconButton, Sheet, Table, Typography} from "@mui/joy";
+import {
+    Box,
+    Button,
+    ButtonGroup,
+    Chip,
+    FormLabel,
+    IconButton,
+    LinearProgress,
+    Sheet,
+    Table,
+    Typography
+} from "@mui/joy";
 import {DEFAULT_USER_DATA, Task, UserData} from "../interfaces.ts";
 import {useEffect, useState} from "react";
 import {
@@ -19,11 +30,12 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import EditTaskModalWithButton from "../modals/EditTaskModal.tsx";
 import {callBackend} from "../Utils.ts";
 import IgnoresInput from "../components/IgnoresInput.tsx";
+import React from "react";
 
 export default function TaskPage({
     userData,
     setUserData,
-    setPassword
+    setPassword,
 } : {
     userData: UserData;
     setUserData: (userData: UserData) => void;
@@ -38,11 +50,21 @@ export default function TaskPage({
 
     const [taskModalOpen, setTaskModalOpen] = useState(false);
 
+    const [progresses, setProgresses] = useState<Map<string, number>>(new Map());
+
     useEffect(() => {
         if (userData.Uuid.length === 0) {
             window.location.href = '/';
         }
     }, [userData, setUserData]);
+
+    useEffect(() => {
+        tasks.map((t) => {
+            if (!t.paused) {
+                sync(t);
+            }
+        });
+    }, []);
 
     function setGlobalIgnores(ignores: string[]) {
         localStorage.setItem(GLOABL_IGNORES_STORAGE_KEY, JSON.stringify(ignores));
@@ -78,9 +100,11 @@ export default function TaskPage({
 
     function sync(task: Task) {
         callBackend("sync", {
-            tasks: [task],
-            ignores: globalIgnores
-        }).then().catch();
+            task: task,
+            ignores: globalIgnores,
+        }).then(() => {
+            getProgress(task.uuid);
+        }).catch();
     }
 
     function handlePause(task: Task) {
@@ -110,13 +134,37 @@ export default function TaskPage({
         newTasks[index] = newTask;
         setTasks(newTasks);
     }
-
+    
     function handleDelete(task: Task) {
         let newTasks = JSON.parse(JSON.stringify(tasks));
         if (tasks.indexOf(task) !== -1) {
             newTasks.splice(tasks.indexOf(task), 1);
         }
         setTasks(newTasks);
+    }
+
+    function getProgress(uuid: string, task?: Task) {
+        let ts: Task[] = JSON.parse(getValueFromStorage(TASKS_STORAGE_KEY, JSON.stringify(tasks)));
+        task = task || ts.find(t => t.uuid === uuid);
+        if (task && !task.paused) {
+            callBackend('progress', {
+                uuid: task.uuid
+            }).then((res) => {
+                let percent = res.data.current / res.data.total * 100;
+                percent = parseFloat(percent.toFixed(2));
+                let newProgresses = new Map(progresses);
+                newProgresses.set(task.uuid, percent);
+                setProgresses(newProgresses);
+                setTimeout(() => {
+                    getProgress(uuid);
+                }, 500);
+            }).catch((err) => {
+                console.log(err);
+                setTimeout(() => {
+                    getProgress(uuid);
+                }, 500);
+            });
+        }
     }
 
     return (
@@ -165,79 +213,117 @@ export default function TaskPage({
                     </thead>
                     <tbody>
                     {tasks.map((task: Task) => (
-                        <tr key={task.uuid}>
-                            <td>
-                                <Typography sx={TYPOGRAPHY_OVERFLOW_SX}>
-                                    {task.localDir}
-                                </Typography>
-                            </td>
-                            <td>
-                                <Box sx={{
-                                    display: 'flex', flexFlow: 'row wrap', justifyContent: 'flex-start', alignItems: 'center',
-                                    gap: PAD/2, flexDirection: 'row'
-                                }}>
+                        <React.Fragment key={task.uuid}>
+                            <tr>
+                                <td>
                                     <Typography sx={TYPOGRAPHY_OVERFLOW_SX}>
-                                        {getName(task.remoteDir)}
+                                        {task.localDir}
                                     </Typography>
-                                    <Typography sx={TYPOGRAPHY_OVERFLOW_SX}>
-                                        ({task.remoteDir.Path})
-                                    </Typography>
-                                </Box>
-                            </td>
-                            <td>
-                                <Box sx={{
-                                    display: 'flex', flexFlow: 'row wrap', justifyContent: 'flex-start', alignItems: 'center',
-                                    gap: PAD/2, flexDirection: 'row'
-                                }}>
-                                    {
-                                        task.ignores.map((ignore, index) => (
-                                            <Chip key={index}>{ignore}</Chip>
-                                        ))
-                                    }
-                                </Box>
-                            </td>
-                            <td>
-                                <Typography sx={TYPOGRAPHY_OVERFLOW_SX}>
-                                    {task.repeatInterval} {task.repeatIntervalUnit.name}
-                                </Typography>
-                            </td>
-                            <td>
-                                <Box sx={{display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center'}}>
-                                    <ButtonGroup
-                                        aria-label="radius primary button group"
-                                        sx={{ '--ButtonGroup-radius': '40px' }}
-                                        size="sm"
-                                        orientation="vertical"
-                                    >
+                                </td>
+                                <td>
+                                    <Box sx={{
+                                        display: 'flex',
+                                        flexFlow: 'row wrap',
+                                        justifyContent: 'flex-start',
+                                        alignItems: 'center',
+                                        gap: PAD / 2,
+                                        flexDirection: 'row'
+                                    }}>
+                                        <Typography sx={TYPOGRAPHY_OVERFLOW_SX}>
+                                            {getName(task.remoteDir)}
+                                        </Typography>
+                                        <Typography sx={TYPOGRAPHY_OVERFLOW_SX}>
+                                            ({task.remoteDir.Path})
+                                        </Typography>
+                                    </Box>
+                                </td>
+                                <td>
+                                    <Box sx={{
+                                        display: 'flex',
+                                        flexFlow: 'row wrap',
+                                        justifyContent: 'flex-start',
+                                        alignItems: 'center',
+                                        gap: PAD / 2,
+                                        flexDirection: 'row'
+                                    }}>
                                         {
-                                            task.paused ? (
-                                                <IconButton onClick={() => handlePlay(task)}>
-                                                    <PlayArrowIcon/>
-                                                </IconButton>
-                                            ) : (
-                                                <IconButton onClick={() => handlePause(task)}>
-                                                    <PauseIcon/>
-                                                </IconButton>
-                                            )
+                                            task.ignores.map((ignore, index) => (
+                                                <Chip key={index}>{ignore}</Chip>
+                                            ))
                                         }
-                                        <EditTaskModalWithButton
-                                            task={task}
-                                            saveTask={saveTask}
-                                        />
-                                        <IconButton onClick={() => handleDelete(task)}>
-                                            <DeleteOutlineIcon/>
-                                        </IconButton>
-                                    </ButtonGroup>
-                                </Box>
-                            </td>
-                        </tr>
+                                    </Box>
+                                </td>
+                                <td>
+                                    <Typography sx={TYPOGRAPHY_OVERFLOW_SX}>
+                                        {task.repeatInterval} {task.repeatIntervalUnit.name}
+                                    </Typography>
+                                </td>
+                                <td>
+                                    <Box sx={{
+                                        display: 'flex',
+                                        flexDirection: 'row',
+                                        justifyContent: 'flex-end',
+                                        alignItems: 'center'
+                                    }}>
+                                        <ButtonGroup
+                                            aria-label="radius primary button group"
+                                            sx={{'--ButtonGroup-radius': '40px'}}
+                                            size="sm"
+                                            orientation="vertical"
+                                        >
+                                            {
+                                                task.paused ? (
+                                                    <IconButton onClick={() => handlePlay(task)}>
+                                                        <PlayArrowIcon/>
+                                                    </IconButton>
+                                                ) : (
+                                                    <IconButton onClick={() => handlePause(task)}>
+                                                        <PauseIcon/>
+                                                    </IconButton>
+                                                )
+                                            }
+                                            <EditTaskModalWithButton
+                                                task={task}
+                                                saveTask={saveTask}
+                                            />
+                                            <IconButton onClick={() => handleDelete(task)}>
+                                                <DeleteOutlineIcon/>
+                                            </IconButton>
+                                        </ButtonGroup>
+                                    </Box>
+                                </td>
+                            </tr>
+                            {
+                                task.paused ?
+                                    <></>
+                                : (
+                                    <tr>
+                                        <td colSpan={5} style={{textAlign: 'center'}}>
+                                            <Box sx={{
+                                                display: 'flex', flexDirection: 'row', justifyContent: 'space-between',
+                                                alignItems: 'center', gap: PAD
+                                            }}>
+                                                <LinearProgress
+                                                    determinate
+                                                    value={progresses.get(task.uuid) || 0}
+                                                    sx={{flexGrow: 1}}
+                                                />
+                                                <Typography level="body-sm">
+                                                    {progresses.get(task.uuid) || 0}%
+                                                </Typography>
+                                            </Box>
+                                        </td>
+                                    </tr>
+                                    )
+                            }
+                        </React.Fragment>
                     ))}
                     </tbody>
                     <tfoot>
                     <tr>
                         <td colSpan={5} style={{textAlign: 'center'}}>
                             <Box sx={{width: '100%', pb: PAD}}>
-                                <FormLabel sx={{p: PAD/2}}>
+                                <FormLabel sx={{p: PAD / 2}}>
                                     Global Ignore
                                 </FormLabel>
                                 <IgnoresInput ignores={globalIgnores} setIgnores={setGlobalIgnores}/>

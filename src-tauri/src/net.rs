@@ -1,20 +1,20 @@
-use std::{path::PathBuf, str::FromStr, sync::Mutex};
+use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Mutex, thread::sleep, time::Duration};
 
+use aws_config::{AppName, BehaviorVersion, Region, SdkConfig};
+use aws_sdk_s3::{config::{Credentials, SharedCredentialsProvider}, primitives::ByteStream, Client};
 use lazy_static::lazy_static;
-use reqwest::{Error, Response};
-use s3::{creds::Credentials, Bucket};
 use serde_json::json;
 use tauri::async_runtime::JoinHandle;
 use walkdir::WalkDir;
-use tokio::{fs::File, io::BufReader};
 
-use crate::structs::{parse_json, BulkMetaData, BulkNode, CommandResponse, SessionData, SyncTask, TaskData, UserData};
+use crate::structs::{parse_json, BulkMetaData, BulkNode, CommandResponse, SessionData, SyncTask, TaskData, TaskProcess, UserData};
 
 static mut ENDPOINT: String = String::new();
 static mut USERNAME: String = String::new();
 lazy_static! {
 	pub static ref SESSION: Mutex<SessionData> = Mutex::new(SessionData::default());
 	pub static ref SYNC_HANDLERS: Mutex<Vec<(String, JoinHandle<()>)>> = Mutex::new(vec![]);
+	pub static ref SYNC_PROCESS: Mutex<HashMap<String, TaskProcess>> = Mutex::new(HashMap::new());
 }
 
 fn get_endpoint() -> String {
@@ -34,34 +34,33 @@ fn get_jwt() -> String {
 	session.JWT.clone()
 }
 
-async fn post<T: ToString>(api: T, data: String) -> Result<Response, Error> {
-	let client = reqwest::Client::new();
+async fn post<T: ToString>(api: T, data: String) -> Result<surf::Response, surf::Error> {
 	let endpoint = get_endpoint();
 
-	println!("Posting {} with body: {}", api.to_string(), &data);
-	client.post(format!("{}{}", &endpoint, api.to_string()))
+	println!("Posting {}{} with body: {}", &endpoint, api.to_string(), &data);
+	surf::post(format!("{}{}", &endpoint, api.to_string()))
 		.body(data)
-		.bearer_auth(get_jwt())
+		.header("Authorization", format!("Bearer {}", get_jwt()))
 		.send().await
 }
 
-async fn post_without_bearer<T: ToString>(api: T, data: String) -> Result<Response, Error> {
-	let client = reqwest::Client::new();
-	let endpoint = get_endpoint();
-
-	println!("Posting {} without bearer with body: {}", api.to_string(), &data);
-	client.post(format!("{}{}", &endpoint, api.to_string()))
+async fn post_without_bearer<T: ToString>(api: T, data: String) -> Result<surf::Response, surf::Error> {
+	println!("Posting {}{} without bearer with body: {}", get_endpoint(), api.to_string(), &data);
+	let res = surf::post(
+		format!("{}{}", &get_endpoint(), api.to_string())
+	)
 		.body(data)
-		.send().await
+		.send().await;
+
+	res
 }
 
-async fn get<T: ToString>(api: T) -> Result<Response, Error> {
-	let client = reqwest::Client::new();
+async fn get<T: ToString>(api: T) -> Result<surf::Response, surf::Error> {
 	let endpoint = get_endpoint();
 
-	println!("Getting {}", api.to_string());
-	client.get(format!("{}{}", &endpoint, api.to_string()))
-		.bearer_auth(get_jwt())
+	println!("Getting {}{}", &endpoint, api.to_string());
+	surf::get(format!("{}{}", &endpoint, api.to_string()))
+		.header("Authorization", format!("Bearer {}", get_jwt()))
 		.send().await
 }
 
@@ -74,7 +73,7 @@ pub async fn connect(endpoint: String, username: String) -> String {
 
 	let res = get(format!("/a/user/{}", username.to_lowercase())).await;
 	if res.is_ok() {
-		let t = res.unwrap().text().await.unwrap();
+		let t = res.unwrap().body_string().await.unwrap();
 		let data: UserData = parse_json(&t);
 
 		CommandResponse::ok(data).to_string()
@@ -103,7 +102,7 @@ pub async fn list(p: String) -> String {
 	).await;
 
 	if res.is_ok() {
-		let t = res.unwrap().text().await.unwrap();
+		let t = res.unwrap().body_string().await.unwrap();
 		let data: BulkMetaData = parse_json(&t);
 
 		CommandResponse::ok(data).to_string()
@@ -133,7 +132,7 @@ pub async fn login(endpoint: String, username: String, password: String) -> Stri
 	).await;
 
 	if res.is_ok() {
-		let t = res.unwrap().text().await.unwrap();
+		let t = res.unwrap().body_string().await.unwrap();
 		if t.contains("Login failed") {
 			return CommandResponse::<SessionData>::err(
 				"Login failed"
@@ -141,6 +140,7 @@ pub async fn login(endpoint: String, username: String, password: String) -> Stri
 		}
 
 		let data: SessionData = parse_json(&t);
+		println!("Login: {:?}", &data);
 		let mut session = SESSION.lock().unwrap();
 		*session = data.clone();
 
@@ -153,51 +153,67 @@ pub async fn login(endpoint: String, username: String, password: String) -> Stri
 }
 
 #[tauri::command]
-pub async fn sync(tasks: Vec<TaskData>, ignores: Vec<String>) -> String {
+pub async fn sync(task: TaskData, ignores: Vec<String>) -> String {
 	let session = SESSION.lock().unwrap();
 	let access_token = session.Token.AccessToken.clone();
 	let id_token = session.Token.IDToken.clone();
 	drop(session);
 
-	for task in tasks {
-		if !task.paused {
-			let global_ignores = [&ignores.clone()[..], &task.ignores[..]].concat();
-			let this_access_token = access_token.clone();
-			let this_id_token = id_token.clone();
-			println!("Sync Task {:?}", &task);
-			let handler = tauri::async_runtime::spawn(async move {
-				_sync(
-					task.localDir,
-					task.remoteDir,
-					global_ignores,
-					this_access_token,
-					this_id_token
-				).await;
-			});
-			let mut handlers = SYNC_HANDLERS.lock().unwrap();
-			handlers.push((task.uuid.clone(), handler));
+	let handlers = SYNC_HANDLERS.lock().unwrap();
+	for (uuid, _handle) in handlers.iter() {
+		if uuid == &task.uuid {
+			println!("Task {} is already running", uuid);
+			return CommandResponse::<()>::err("").to_string();
 		}
+	}
+	drop(handlers);
+
+	if !task.paused {
+		let all_ignores = [&ignores.clone()[..], &task.ignores[..]].concat();
+		let this_access_token = access_token.clone();
+		let this_id_token = id_token.clone();
+		let uuid = task.uuid.clone();
+		println!("Sync Task {:?}", &task);
+		let handler = tauri::async_runtime::spawn(async move {
+			_sync(
+				task.localDir,
+				task.remoteDir,
+				all_ignores,
+				this_access_token,
+				this_id_token,
+				uuid
+			).await;
+		});
+		let mut handlers = SYNC_HANDLERS.lock().unwrap();
+		handlers.push((task.uuid.clone(), handler));
+		let mut processes = SYNC_PROCESS.lock().unwrap();
+		processes.insert(task.uuid, TaskProcess::default());
 	}
 
 	CommandResponse::<()>::ok(()).to_string()
 }
 
-async fn _sync(local: String, remote: BulkNode, ignores: Vec<String>, access_token: String, id_token: String) {
-	let bucket = Bucket::new(
-		"io",
-		s3::Region::Custom { region: "".to_string(), endpoint: get_endpoint() },
-		Credentials::new(
-			Some(&access_token),
-			Some(&id_token),
-			None,
-			None,
-			Some("s3")
-		).unwrap()
-	);
-	if bucket.is_err() {
-		return ;
-	}
-	let bucket = bucket.unwrap();
+async fn _sync(
+	local: String, remote: BulkNode, ignores: Vec<String>,
+	access_token: String, id_token: String, uuid: String
+) {
+	let config = SdkConfig::builder()
+		.endpoint_url(get_endpoint())
+		.app_name(AppName::new("s3").unwrap())
+		.behavior_version(BehaviorVersion::latest())
+		.region(Region::new("auto"))
+		.credentials_provider(
+			SharedCredentialsProvider::new(
+				Credentials::new(
+					access_token,
+					id_token,
+					None, None,
+					"cells"
+				)
+			)
+		).build();
+
+	let s3_client = Client::new(&config);
 
 	let remote_path = remote.Path;
 	let local_path = PathBuf::from_str(&local).unwrap();
@@ -226,19 +242,32 @@ async fn _sync(local: String, remote: BulkNode, ignores: Vec<String>, access_tok
 		}
 	}
 
+	let mut process = TaskProcess::default();
+	process.total = syncTasks.len();
+
 	// upload
 	for syncTask in syncTasks {
-		let f = File::open(syncTask.from.clone()).await.unwrap();
-		let mut reader = BufReader::new(f);
-		println!("Put {:?} to \"{}/io/{}\"", &syncTask.from, get_endpoint(), &syncTask.to);
-		let res = bucket.put_object_stream(
-			&mut reader,
-			syncTask.to.clone()
-		).await;
-		if res.is_ok() {
-			println!("Success");
+		let body = ByteStream::from_path(&syncTask.from).await;
+		if body.is_ok() {
+			println!("Put {} to {}", &syncTask.from.to_str().unwrap(), &syncTask.to);
+			let res = s3_client.put_object()
+				.bucket("io")
+				.key(syncTask.to)
+				.body(body.unwrap())
+				.send()
+				.await;
+			if res.is_ok() {
+				println!("Success");
+				process.current += 1;
+				let mut processes = SYNC_PROCESS.lock().unwrap();
+				processes.insert(uuid.clone(), process.clone());
+				drop(processes);
+			} else {
+				println!("Failed: {:?}", &res);
+			}
+			sleep(Duration::from_secs(1));
 		} else {
-			println!("Failed: {:?}", &res);
+			println!("Failed: {:?}", &body.err());
 		}
 	}
 }
@@ -252,10 +281,19 @@ pub fn pause(uuid: String) -> String {
 				handler.abort();
 				println!("Pause task {}", &uuid);
 				handlers.remove(i);
-				return CommandResponse::<()>::ok(()).to_string();
 			}
 		}
 	}
 
-	CommandResponse::<()>::err("Task is not running").to_string()
+	CommandResponse::<()>::ok(()).to_string()
+}
+
+#[tauri::command]
+pub fn progress(uuid: String) -> String {
+	let task_process = SYNC_PROCESS.lock().unwrap();
+	if let Some(process) = task_process.get(&uuid) {
+		CommandResponse::ok(process.clone()).to_string()
+	} else {
+		CommandResponse::<()>::err("Task is not running").to_string()
+	}
 }

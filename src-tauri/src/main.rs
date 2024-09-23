@@ -40,7 +40,8 @@ fn main() {
             list,
             login,
             sync,
-            pause
+            pause,
+            progress
         ])
         .build(tauri::generate_context!()).unwrap();
 

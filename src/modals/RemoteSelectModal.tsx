@@ -188,5 +188,5 @@ export function getName(node: BulkNode): string {
     if (n.startsWith('"')) {
         n = n.substring(1, n.length);
     }
-    return n.toString();
+    return n;
 }

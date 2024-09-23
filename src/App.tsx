@@ -40,11 +40,6 @@ function App() {
         setFullUrl(new URL(full));
     }
 
-    function setPat(pat: string) {
-        localStorage.setItem(PAT_STORAGE_KEY, pat);
-        _setPat(pat);
-    }
-
     function setPassword(password: string) {
         localStorage.setItem(PASSWORD_STORAGE_KEY, password);
         _setPassword(password);
@@ -70,10 +65,13 @@ function App() {
                 if (res.success) {
                     setUserData(res.data);
                     return;
+                } else {
+                    window.location.href = '/';
                 }
             }
         } catch {
             console.log("Failed to connect to server");
+            return;
         }
     }
 
@@ -101,7 +99,7 @@ function App() {
             element: <TaskPage
                 userData={userData}
                 setUserData={setUserData}
-                setPat={setPassword}
+                setPassword={setPassword}
             />
         }
     ]);

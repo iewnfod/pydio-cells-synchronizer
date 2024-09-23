@@ -70,9 +70,7 @@ export default function LoginPage({
         setUname(username);
         connect().then(() => {
             setLoading(false);
-            setTimeout(() => {
-                window.location.href = "/tasks";
-            }, 100);
+            window.location.href = "/tasks";
         }).catch(() => {
             setLoading(false);
         });

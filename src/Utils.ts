@@ -13,11 +13,17 @@ export function randomNum(minNum: number, maxNum: number){
 }
 
 export async function callBackend(name: string, args: any) {
-    let res = JSON.parse(await invoke(name, args));
-    if (res.success) {
-        return res;
-    } else {
-        toast.error(res.message, {id: res.message});
-        throw res.message;
+    try {
+        let res = JSON.parse(await invoke(name, args));
+        if (res.success) {
+            return res;
+        } else {
+            if (res.message.length > 0) {
+                toast.error(res.message, {id: res.message});
+            }
+        }
+    } catch {
+        toast.error("Unknown Backend Error");
+        throw "Unknown Backend Error";
     }
 }

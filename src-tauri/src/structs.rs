@@ -101,6 +101,12 @@ pub struct TimeUnit {
 	level: f64
 }
 
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct TaskProcess {
+	pub total: usize,
+	pub current: usize
+}
+
 pub fn parse_json<'a, T: Default + Deserialize<'a>>(data: &'a str) -> T {
 	let result: Result<T, serde_json::Error> = serde_json::from_str(data);
 	match result {
