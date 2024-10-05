@@ -104,6 +104,18 @@ export default function TaskPage({
             ignores: globalIgnores,
         }).then(() => {
             getProgress(task.uuid);
+            let ts: Task[] = JSON.parse(getValueFromStorage(TASKS_STORAGE_KEY, JSON.stringify(tasks)));
+            let t = ts.find(ts => ts.uuid === task.uuid);
+            if (t && !t.paused) {
+                setTimeout(() => {
+                    let ts: Task[] = JSON.parse(getValueFromStorage(TASKS_STORAGE_KEY, JSON.stringify(tasks)));
+                    let t = ts.find(ts => ts.uuid === task.uuid);
+                    if (t && !t.paused) {
+                        console.log(`Repeat ${t.uuid}`);
+                        sync(t);
+                    }
+                }, t.repeatInterval * t.repeatIntervalUnit.level * 1000);
+            }
         }).catch();
     }
 

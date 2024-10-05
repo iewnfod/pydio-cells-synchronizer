@@ -26,6 +26,11 @@ export function getValueFromStorage(key: string, defaultValue: any) {
     return localStorage.getItem(key) || defaultValue;
 }
 
+export const SECOND_UNIT: TimeUnit = {
+    name: "second",
+    level: 1,
+}
+
 export const MINUTE_UNIT: TimeUnit = {
     name: "minute",
     level: 60
@@ -42,6 +47,7 @@ export const DAY_UNIT: TimeUnit = {
 }
 
 export const UNITS: TimeUnit[] = [
+    SECOND_UNIT,
     MINUTE_UNIT,
     HOUR_UNIT,
     DAY_UNIT

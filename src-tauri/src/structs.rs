@@ -102,7 +102,7 @@ pub struct TimeUnit {
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct TaskProcess {
+pub struct TaskProgress {
 	pub total: usize,
 	pub current: usize
 }

@@ -7,7 +7,7 @@ use serde_json::json;
 use tauri::async_runtime::JoinHandle;
 use walkdir::WalkDir;
 
-use crate::{etag::calculate_etag, structs::{parse_json, BulkMetaData, BulkNode, CommandResponse, SessionData, SyncTask, TaskData, TaskProcess, UserData}};
+use crate::{etag::calculate_etag, structs::{parse_json, BulkMetaData, BulkNode, CommandResponse, SessionData, SyncTask, TaskData, TaskProgress, UserData}};
 
 const BUCKET_NAME: &str = "io";
 
@@ -18,7 +18,7 @@ static mut PASSWORD: String = String::new();
 lazy_static! {
 	pub static ref SESSION: Mutex<SessionData> = Mutex::new(SessionData::default());
 	pub static ref SYNC_HANDLERS: Mutex<Vec<(String, JoinHandle<()>)>> = Mutex::new(vec![]);
-	pub static ref SYNC_PROCESS: Mutex<HashMap<String, TaskProcess>> = Mutex::new(HashMap::new());
+	pub static ref SYNC_PROGRESS: Mutex<HashMap<String, TaskProgress>> = Mutex::new(HashMap::new());
 }
 
 fn get_endpoint() -> String {
@@ -162,10 +162,15 @@ pub async fn sync(task: TaskData, ignores: Vec<String>) -> String {
 	drop(session);
 
 	let handlers = SYNC_HANDLERS.lock().unwrap();
-	for (uuid, _handle) in handlers.iter() {
+	for (uuid, handler) in handlers.iter() {
 		if uuid == &task.uuid {
-			println!("Task {} is already running", uuid);
-			return CommandResponse::<()>::err("").to_string();
+			if !handler.inner().is_finished() {
+				println!("Task {} is already running", uuid);
+				return CommandResponse::<()>::err("").to_string();
+			} else {
+				pause(uuid.clone());
+				break;
+			}
 		}
 	}
 	drop(handlers);
@@ -188,8 +193,8 @@ pub async fn sync(task: TaskData, ignores: Vec<String>) -> String {
 		});
 		let mut handlers = SYNC_HANDLERS.lock().unwrap();
 		handlers.push((task.uuid.clone(), handler));
-		let mut processes = SYNC_PROCESS.lock().unwrap();
-		processes.insert(task.uuid, TaskProcess::default());
+		let mut progresses = SYNC_PROGRESS.lock().unwrap();
+		progresses.insert(task.uuid, TaskProgress::default());
 	}
 
 	CommandResponse::<()>::ok(()).to_string()
@@ -224,7 +229,7 @@ async fn _sync(
 	}
 
 	let walk = WalkDir::new(&local_path);
-	let mut syncTasks: Vec<SyncTask> = vec![];
+	let mut sync_tasks: Vec<SyncTask> = vec![];
 
 	println!("Start to collect files for task {}", &uuid);
 	'walk_loop: for p in walk {
@@ -267,37 +272,39 @@ async fn _sync(
 				}
 			}
 
-			syncTasks.push(SyncTask { from: path.to_path_buf(), to: s3_path.clone() });
+			println!("Add unsynchronized file {:?} to task {}", &path, &uuid);
+			sync_tasks.push(SyncTask { from: path.to_path_buf(), to: s3_path.clone() });
 		}
 	}
 
-	let mut process = TaskProcess::default();
-	process.total = syncTasks.len();
+	let mut progress = TaskProgress::default();
+	progress.total = sync_tasks.len();
 
 	// upload
-	for syncTask in syncTasks {
-		let body = ByteStream::from_path(&syncTask.from).await;
+	while let Some(sync_task) = sync_tasks.pop() {
+		let body = ByteStream::from_path(&sync_task.from).await;
 		if body.is_ok() {
-			println!("Put {} to {}", &syncTask.from.to_str().unwrap(), &syncTask.to);
+			println!("Putting {} to {}", &sync_task.from.to_str().unwrap(), &sync_task.to);
 			let res = s3_client
 				.put_object()
 				.bucket(BUCKET_NAME)
-				.key(syncTask.to)
+				.key(&sync_task.to)
 				.body(body.unwrap())
 				.send()
 				.await;
 			if res.is_ok() {
 				println!("Success");
-				process.current += 1;
-				let mut processes = SYNC_PROCESS.lock().unwrap();
-				processes.insert(uuid.clone(), process.clone());
-				drop(processes);
+				progress.current += 1;
+				let mut progresses = SYNC_PROGRESS.lock().unwrap();
+				progresses.insert(uuid.clone(), progress.clone());
+				drop(progresses);
 			} else {
 				println!("Failed: {:?}", &res);
+				sync_tasks.push(sync_task.clone());
 			}
 			sleep(Duration::from_secs(1));
 		} else {
-			println!("Failed: {:?}", &body.err());
+			println!("Failed to read file: {:?}", &body.err());
 		}
 	}
 }
@@ -320,9 +327,12 @@ pub fn pause(uuid: String) -> String {
 
 #[tauri::command]
 pub fn progress(uuid: String) -> String {
-	let task_process = SYNC_PROCESS.lock().unwrap();
-	if let Some(process) = task_process.get(&uuid) {
-		CommandResponse::ok(process.clone()).to_string()
+	let task_progress = SYNC_PROGRESS.lock().unwrap();
+	if let Some(progress) = task_progress.get(&uuid) {
+		if progress.current == progress.total && progress.total != 0 {
+			pause(uuid.clone());
+		}
+		CommandResponse::ok(progress.clone()).to_string()
 	} else {
 		CommandResponse::<()>::err("Task is not running").to_string()
 	}
