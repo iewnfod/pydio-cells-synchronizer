@@ -4,7 +4,6 @@ use aws_config::{AppName, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_s3::{config::{Credentials, SharedCredentialsProvider}, primitives::ByteStream, Client};
 use lazy_static::lazy_static;
 use serde_json::json;
-use surf::StatusCode;
 use tauri::async_runtime::JoinHandle;
 use walkdir::WalkDir;
 
