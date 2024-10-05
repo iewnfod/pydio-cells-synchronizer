@@ -1,7 +1,7 @@
 [package]
 name = "pydio-cells-synchronizer"
 version = "0.1.0"
-description = "A desktop synchronizer for Pydio Cells"
+description = "A third party tool to synchronize local files to Pydio Cells."
 authors = ["Iewnfod"]
 edition = "2021"
 

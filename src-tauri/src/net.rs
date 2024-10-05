@@ -299,7 +299,8 @@ async fn _sync(
 				progresses.insert(uuid.clone(), progress.clone());
 				drop(progresses);
 			} else {
-				println!("Failed: {:?}", &res);
+				let e = res.unwrap_err();
+				println!("Failed: {}", e.into_service_error().meta().to_string());
 				sync_tasks.push(sync_task.clone());
 			}
 			sleep(Duration::from_secs(1));
@@ -307,17 +308,22 @@ async fn _sync(
 			println!("Failed to read file: {:?}", &body.err());
 		}
 	}
+
+	pause(uuid.clone());
 }
 
 #[tauri::command]
 pub fn pause(uuid: String) -> String {
 	let mut handlers = SYNC_HANDLERS.lock().unwrap();
+	let mut task_progress = SYNC_PROGRESS.lock().unwrap();
 	for i in 0..handlers.len() {
 		if let Some((task_uuid, handler)) = handlers.get(i) {
 			if task_uuid == &uuid {
 				handler.abort();
 				println!("Pause task {}", &uuid);
 				handlers.remove(i);
+				task_progress.remove(&uuid);
+				return CommandResponse::<()>::ok(()).to_string();
 			}
 		}
 	}
@@ -334,6 +340,6 @@ pub fn progress(uuid: String) -> String {
 		}
 		CommandResponse::ok(progress.clone()).to_string()
 	} else {
-		CommandResponse::<()>::err("Task is not running").to_string()
+		CommandResponse::<()>::err("").to_string()
 	}
 }

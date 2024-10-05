@@ -55,16 +55,14 @@ export default function TaskPage({
     useEffect(() => {
         if (userData.Uuid.length === 0) {
             window.location.href = '/';
+        } else {
+            tasks.map((t) => {
+                if (!t.paused) {
+                    sync(t);
+                }
+            });
         }
     }, [userData, setUserData]);
-
-    useEffect(() => {
-        tasks.map((t) => {
-            if (!t.paused) {
-                sync(t);
-            }
-        });
-    }, []);
 
     function setGlobalIgnores(ignores: string[]) {
         localStorage.setItem(GLOABL_IGNORES_STORAGE_KEY, JSON.stringify(ignores));
@@ -306,7 +304,7 @@ export default function TaskPage({
                                 </td>
                             </tr>
                             {
-                                task.paused ?
+                                task.paused || (progresses.get(task.uuid) || 0) === 0 ?
                                     <></>
                                 : (
                                     <tr>
