@@ -10,7 +10,7 @@ import {
     Table,
     Typography
 } from "@mui/joy";
-import {DEFAULT_USER_DATA, Task, UserData} from "../interfaces.ts";
+import {Task} from "../interfaces.ts";
 import {useEffect, useState} from "react";
 import {
     getValueFromStorage,
@@ -33,12 +33,8 @@ import IgnoresInput from "../components/IgnoresInput.tsx";
 import React from "react";
 
 export default function TaskPage({
-    userData,
-    setUserData,
     setPassword,
 } : {
-    userData: UserData;
-    setUserData: (userData: UserData) => void;
     setPassword: (password: string) => void;
 }) {
     const [tasks, _setTasks] = useState<Task[]>(
@@ -53,16 +49,12 @@ export default function TaskPage({
     const [progresses, setProgresses] = useState<Map<string, number>>(new Map());
 
     useEffect(() => {
-        if (userData.Uuid.length === 0) {
-            window.location.href = '/';
-        } else {
-            tasks.map((t) => {
-                if (!t.paused) {
-                    sync(t);
-                }
-            });
-        }
-    }, [userData, setUserData]);
+        tasks.map((t) => {
+            if (!t.paused) {
+                sync(t);
+            }
+        });
+    }, []);
 
     function setGlobalIgnores(ignores: string[]) {
         localStorage.setItem(GLOABL_IGNORES_STORAGE_KEY, JSON.stringify(ignores));
@@ -83,7 +75,6 @@ export default function TaskPage({
     }
 
     function handleLogout() {
-        setUserData(DEFAULT_USER_DATA);
         setPassword("");
     }
 
@@ -97,6 +88,7 @@ export default function TaskPage({
     }
 
     function sync(task: Task) {
+        console.log("sync", task.uuid);
         callBackend("sync", {
             task: task,
             ignores: globalIgnores,
@@ -160,19 +152,24 @@ export default function TaskPage({
             callBackend('progress', {
                 uuid: task.uuid
             }).then((res) => {
-                let percent = res.data.current / res.data.total * 100;
-                percent = parseFloat(percent.toFixed(2));
+                let percent = 0;
+                if (res) {
+                    percent = res.data.current / res.data.total * 100;
+                    percent = parseFloat(percent.toFixed(2));
+                }
+
                 let newProgresses = new Map(progresses);
                 newProgresses.set(task.uuid, percent);
                 setProgresses(newProgresses);
+
                 setTimeout(() => {
                     getProgress(uuid);
-                }, 500);
+                }, 100);
             }).catch((err) => {
                 console.log(err);
                 setTimeout(() => {
                     getProgress(uuid);
-                }, 500);
+                }, 100);
             });
         }
     }

@@ -1,35 +1,23 @@
 import {Box, Grid} from "@mui/joy";
-import {useEffect, useState} from "react";
+import {useState} from "react";
 import {createBrowserRouter, RouterProvider} from "react-router-dom";
 import LoginPage from "./pages/LoginPage.tsx";
 import {
     BASE_URL_STORAGE_KEY,
     getValueFromStorage, PASSWORD_STORAGE_KEY,
-    PAT_STORAGE_KEY,
-    URL_PREFIX_STORAGE_KEY, USER_DATA_STORAGE_KEY,
+    URL_PREFIX_STORAGE_KEY,
     USERNAME_STORAGE_KEY
 } from "./constants.ts";
-import {Toaster} from "react-hot-toast";
+import toast, {Toaster} from "react-hot-toast";
 import {callBackend} from "./Utils.ts";
-import {DEFAULT_USER_DATA, UserData} from "./interfaces.ts";
 import TaskPage from "./pages/TaskPage.tsx";
 
 function App() {
     const [baseUrl, _setBaseUrl] = useState(getValueFromStorage(BASE_URL_STORAGE_KEY, ""));
     const [urlPrefix, _setUrlPrefix] = useState(getValueFromStorage(URL_PREFIX_STORAGE_KEY, "https://"));
-    const [pat, _setPat] = useState(getValueFromStorage(PAT_STORAGE_KEY, ""));
     const [password, _setPassword] = useState(getValueFromStorage(PASSWORD_STORAGE_KEY, ""));
     const [fullUrl, setFullUrl] = useState<URL>(new URL(urlPrefix + baseUrl));
     const [username, _setUsername] = useState(getValueFromStorage(USERNAME_STORAGE_KEY, ""));
-
-    const [userData, _setUserData] = useState<UserData>(
-        JSON.parse(getValueFromStorage(USER_DATA_STORAGE_KEY, JSON.stringify(DEFAULT_USER_DATA)))
-    );
-
-    function setUserData(data: UserData) {
-        _setUserData(data);
-        localStorage.setItem(USER_DATA_STORAGE_KEY, JSON.stringify(data));
-    }
 
     function setBaseUrl(baseUrl: string, urlPrefix: string) {
         let full = `${urlPrefix}${baseUrl}`;
@@ -58,26 +46,15 @@ function App() {
                 password: password
             });
             if (loginRes.success) {
-                let res = await callBackend("connect", {
-                    endpoint: fullUrl.toString(),
-                    username: username,
-                });
-                if (res.success) {
-                    setUserData(res.data);
-                    return;
-                } else {
-                    window.location.href = '/';
-                }
+                console.log("success");
+                window.location.href = "/tasks";
+            } else {
+                window.location.href = '/';
             }
         } catch {
-            console.log("Failed to connect to server");
-            return;
+            toast.error("Failed to connect to server");
         }
     }
-
-    useEffect(() => {
-        connect().then().catch();
-    }, [username, pat, fullUrl]);
 
     const router = createBrowserRouter([
         {
@@ -91,14 +68,11 @@ function App() {
                 uname={username}
                 setUname={setUsername}
                 connect={connect}
-                userData={userData}
             />,
         },
         {
             path: "/tasks",
             element: <TaskPage
-                userData={userData}
-                setUserData={setUserData}
                 setPassword={setPassword}
             />
         }

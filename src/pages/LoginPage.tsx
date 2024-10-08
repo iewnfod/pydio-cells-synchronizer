@@ -13,7 +13,6 @@ import {
 import React, {useEffect, useState} from "react";
 import {ASPECT_RATIO, BG_URL, PAD2, PAD3, SMALL_PART} from "../constants.ts";
 import toast from "react-hot-toast";
-import {UserData} from "../interfaces.ts";
 
 export default function LoginPage({
     baseUrl,
@@ -24,7 +23,6 @@ export default function LoginPage({
     uname,
     setUname,
     connect,
-    userData
 } : {
     baseUrl: string,
     password: string,
@@ -34,7 +32,6 @@ export default function LoginPage({
     uname: string,
     setUname: (username: string) => void,
     connect: () => Promise<void>,
-    userData: UserData
 }) {
     const [localBaseUrl, setLocalBaseUrl] = useState(baseUrl);
     const [localUrlPrefix, setLocalUrlPrefix] = useState(urlPrefix);
@@ -43,10 +40,8 @@ export default function LoginPage({
     const [username, setUsername] = useState(uname);
 
     useEffect(() => {
-        if (userData !== undefined) {
-            if (userData.Uuid.length > 0) {
-                window.location.href = "/tasks";
-            }
+        if (localBaseUrl && username && localPassword) {
+            handleLogin();
         }
     }, []);
 
@@ -70,7 +65,6 @@ export default function LoginPage({
         setUname(username);
         connect().then(() => {
             setLoading(false);
-            window.location.href = "/tasks";
         }).catch(() => {
             setLoading(false);
         });
