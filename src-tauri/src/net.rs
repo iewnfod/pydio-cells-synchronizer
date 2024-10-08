@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, VecDeque}, path::PathBuf, str::FromStr, sync::Mutex, thread::sleep, time::Duration};
+use std::{collections::{HashMap, HashSet, VecDeque}, path::PathBuf, str::FromStr, sync::Mutex, thread::sleep, time::Duration};
 
 use aws_config::{AppName, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_s3::{config::{Credentials, SharedCredentialsProvider}, error::SdkError, primitives::ByteStream, Client};
@@ -40,6 +40,11 @@ fn get_endpoint() -> String {
 fn get_jwt() -> String {
 	let session = SESSION.lock().unwrap();
 	session.JWT.clone()
+}
+
+fn get_session() -> SessionData {
+	let session = SESSION.lock().unwrap();
+	session.clone()
 }
 
 fn _get_key(key: &str) -> String {
@@ -233,10 +238,6 @@ pub async fn login(endpoint: String, username: String, password: String) -> Stri
 
 #[tauri::command]
 pub async fn sync(task: TaskData, ignores: Vec<String>) -> String {
-	let session = SESSION.lock().unwrap();
-	let access_token = session.Token.AccessToken.clone();
-	let id_token = session.Token.IDToken.clone();
-
 	let handlers = SYNC_HANDLERS.lock().unwrap();
 	for (uuid, handler) in handlers.iter() {
 		if uuid == &task.uuid {
@@ -253,8 +254,6 @@ pub async fn sync(task: TaskData, ignores: Vec<String>) -> String {
 
 	if !task.paused {
 		let all_ignores = [&ignores.clone()[..], &task.ignores[..]].concat();
-		let this_access_token = access_token.clone();
-		let this_id_token = id_token.clone();
 		let uuid = task.uuid.clone();
 		println!("Sync Task {:?}", &task);
 		let handler = tauri::async_runtime::spawn(async move {
@@ -262,8 +261,6 @@ pub async fn sync(task: TaskData, ignores: Vec<String>) -> String {
 				task.localDir,
 				task.remoteDir,
 				all_ignores,
-				this_access_token,
-				this_id_token,
 				uuid
 			).await;
 		});
@@ -275,27 +272,8 @@ pub async fn sync(task: TaskData, ignores: Vec<String>) -> String {
 }
 
 async fn _sync(
-	local: String, remote: BulkNode, ignores: Vec<String>,
-	access_token: String, id_token: String, uuid: String
+	local: String, remote: BulkNode, ignores: Vec<String>, uuid: String
 ) {
-	let config = SdkConfig::builder()
-		.endpoint_url(get_endpoint())
-		.app_name(AppName::new("s3").unwrap())
-		.behavior_version(BehaviorVersion::latest())
-		.region(Region::new("auto"))
-		.credentials_provider(
-			SharedCredentialsProvider::new(
-				Credentials::new(
-					access_token,
-					id_token,
-					None, None,
-					"cells"
-				)
-			)
-		).build();
-
-	let s3_client = Client::new(&config);
-
 	let remote_path = remote.Path;
 	let local_path = PathBuf::from_str(&local).unwrap();
 	if !local_path.exists() {
@@ -328,8 +306,14 @@ async fn _sync(
 
 	new_progress(&uuid, sync_tasks.len());
 
+	let mut finished_tasks: HashSet<PathBuf> = HashSet::new();
+
 	// upload
 	'upload_loop: while let Some(sync_task) = sync_tasks.pop_front() {
+		if finished_tasks.contains(&sync_task.from) {
+			continue 'upload_loop;
+		}
+
 		let body = ByteStream::from_path(&sync_task.from).await;
 		if body.is_ok() {
 			let this_node = post(
@@ -348,8 +332,9 @@ async fn _sync(
 					let etag = calculate_etag(&sync_task.from);
 					if let Ok(tag) = etag {
 						if node_data.Nodes[0].Etag == tag {
-							progress_add_one(&uuid);
-							println!("Skip {:?}", sync_task.from);
+							let progress = progress_add_one(&uuid);
+							finished_tasks.insert(sync_task.from.clone());
+							println!("Skip {:?} {}/{}", sync_task.from, progress.current, progress.total);
 							continue 'upload_loop;
 						}
 					}
@@ -357,6 +342,27 @@ async fn _sync(
 			}
 
 			println!("Putting {} to {}", &sync_task.from.to_str().unwrap(), &sync_task.to);
+
+			let session = get_session();
+
+			let config = SdkConfig::builder()
+			.endpoint_url(get_endpoint())
+			.app_name(AppName::new("s3").unwrap())
+			.behavior_version(BehaviorVersion::latest())
+			.region(Region::new("auto"))
+			.credentials_provider(
+				SharedCredentialsProvider::new(
+					Credentials::new(
+						session.Token.AccessToken,
+						session.Token.IDToken,
+						None, None,
+						"cells"
+					)
+				)
+			).build();
+
+			let s3_client = Client::new(&config);
+
 			let res = s3_client
 				.put_object()
 				.bucket(BUCKET_NAME)
@@ -364,10 +370,12 @@ async fn _sync(
 				.body(body.unwrap())
 				.send()
 				.await;
+
 			match res {
 				Ok(_) => {
-					progress_add_one(&uuid);
-					println!("Success");
+					let progress = progress_add_one(&uuid);
+					finished_tasks.insert(sync_task.from.clone());
+					println!("Success {}/{}", progress.current, progress.total);
 				},
 				Err(e) => {
 					println!("Failed: {:?}", &e);
@@ -391,18 +399,22 @@ async fn _sync(
 	pause(uuid.clone());
 }
 
-fn progress_add_one(uuid: &str) {
+fn progress_add_one(uuid: &str) -> TaskProgress {
 	let mut progresses = SYNC_PROGRESS.lock().unwrap();
+	let mut p = TaskProgress::default();
 	if let Some(progress) = progresses.get_mut(uuid) {
 		progress.current += 1;
+		p = progress.clone();
 	}
+	p
 }
 
-fn new_progress(uuid: &str, total: usize) {
+fn new_progress(uuid: &str, total: usize) -> TaskProgress {
 	let mut progress = TaskProgress::default();
 	progress.total = total;
 	let mut progresses = SYNC_PROGRESS.lock().unwrap();
 	progresses.insert(uuid.to_string(), progress);
+	progress
 }
 
 #[tauri::command]

@@ -101,7 +101,7 @@ pub struct TimeUnit {
 	level: f64
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone, Default, Deserialize, Serialize)]
 pub struct TaskProgress {
 	pub total: usize,
 	pub current: usize

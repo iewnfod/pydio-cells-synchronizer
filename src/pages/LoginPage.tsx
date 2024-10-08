@@ -114,7 +114,7 @@ export default function LoginPage({
                                     <Option value="https://">https://</Option>
                                     <Option value="http://">http://</Option>
                                 </Select>
-                                <Divider orientation="vertical" />
+                                <Divider orientation="vertical"/>
                             </React.Fragment>
                         )}
                     />
