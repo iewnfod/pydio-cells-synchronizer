@@ -33,35 +33,41 @@ export default function LoginPage({
     const [username, setUsername] = useState("");
 
     useEffect(() => {
-        if (localBaseUrl && username && localPassword) {
-            handleLogin();
-        }
         let e = async () => {
+            let uname = await getUsername();
+            let pd = await getPassword();
             // @ts-ignore
-            setUsername(await getUsername());
+            setUsername(uname);
             // @ts-ignore
-            setLocalPassword(await getPassword());
+            setLocalPassword(pd);
+
+            if (localBaseUrl && uname && pd) {
+                // @ts-ignore
+                handleLogin(uname, pd);
+            }
         };
         e().then();
     }, []);
 
-    function handleLogin() {
+    function handleLogin(name?: string, passwd?: string) {
+        let uname = name || username;
+        let pd = passwd || localPassword;
         if (localBaseUrl.length === 0) {
             toast.error('Base url should not be empty');
             return;
         }
-        if (username.length === 0) {
+        if (uname.length === 0) {
             toast.error('Username should not be empty');
             return;
         }
-        if (localPassword.length === 0) {
+        if (pd.length === 0) {
             toast.error('Password should not be empty');
             return;
         }
 
         setLoading(true);
         setBaseUrl(localBaseUrl, localUrlPrefix);
-        connect(username, localPassword).then(() => {
+        connect(uname, pd).then(() => {
             setLoading(false);
         }).catch(() => {
             setLoading(false);

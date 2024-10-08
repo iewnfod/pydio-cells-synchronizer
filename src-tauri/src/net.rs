@@ -91,9 +91,14 @@ pub fn set_password(value: String) -> String {
 }
 
 async fn solve_res(res: Result<surf::Response, surf::Error>) -> Result<surf::Response, surf::Error> {
-	println!("{:?}", res);
 	match res {
-		Ok(r) => Ok(r),
+		Ok(r) => {
+			let status = r.status();
+			if status == StatusCode::Unauthorized {
+				refresh_login().await;
+			}
+			Ok(r)
+		},
 		Err(e) => {
 			let status = e.status();
 			if status == StatusCode::Unauthorized {
@@ -217,6 +222,7 @@ pub async fn login(endpoint: String, username: String, password: String) -> Stri
 		let mut session = SESSION.lock().unwrap();
 		*session = data.clone();
 
+		println!("Login Successfully");
 		CommandResponse::ok(data).to_string()
 	} else {
 		CommandResponse::<SessionData>::err(
