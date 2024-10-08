@@ -13,8 +13,16 @@ export function randomNum(minNum: number, maxNum: number){
 }
 
 export async function callBackend(name: string, args: any) {
+    let flag = false;
+    setTimeout(() => {
+        if (!flag) {
+            toast.error("Timeout");
+            throw "Timeout";
+        }
+    }, 30 * 1000);
     try {
         let res = JSON.parse(await invoke(name, args));
+        flag = true;
         if (res.success) {
             return res;
         } else {
@@ -23,7 +31,16 @@ export async function callBackend(name: string, args: any) {
             }
         }
     } catch {
+        flag = true;
         toast.error("Unknown Backend Error");
         throw "Unknown Backend Error";
     }
+}
+
+export async function getUsername() {
+    return await invoke("get_username") || "";
+}
+
+export async function getPassword() {
+    return await invoke("get_password") || "";
 }

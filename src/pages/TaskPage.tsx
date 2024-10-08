@@ -32,11 +32,7 @@ import {callBackend} from "../Utils.ts";
 import IgnoresInput from "../components/IgnoresInput.tsx";
 import React from "react";
 
-export default function TaskPage({
-    setPassword,
-} : {
-    setPassword: (password: string) => void;
-}) {
+export default function TaskPage() {
     const [tasks, _setTasks] = useState<Task[]>(
         JSON.parse(getValueFromStorage(TASKS_STORAGE_KEY, "[]"))
     );
@@ -75,7 +71,9 @@ export default function TaskPage({
     }
 
     function handleLogout() {
-        setPassword("");
+        callBackend("set_username", {value: ""}).then();
+        callBackend("set_password", {value: ""}).then();
+        window.location.href = "/";
     }
 
     function handlePlay(task: Task) {
@@ -164,12 +162,12 @@ export default function TaskPage({
 
                 setTimeout(() => {
                     getProgress(uuid);
-                }, 100);
+                }, 500);
             }).catch((err) => {
                 console.log(err);
                 setTimeout(() => {
                     getProgress(uuid);
-                }, 100);
+                }, 500);
             });
         }
     }

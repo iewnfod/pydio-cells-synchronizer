@@ -13,36 +13,36 @@ import {
 import React, {useEffect, useState} from "react";
 import {ASPECT_RATIO, BG_URL, PAD2, PAD3, SMALL_PART} from "../constants.ts";
 import toast from "react-hot-toast";
+import {getPassword, getUsername} from "../Utils.ts";
 
 export default function LoginPage({
     baseUrl,
-    password,
     setBaseUrl,
-    setPassword,
     urlPrefix,
-    uname,
-    setUname,
     connect,
 } : {
     baseUrl: string,
-    password: string,
     setBaseUrl: (baseUrl: string, urlPrefix: string) => void,
-    setPassword: (password: string) => void,
     urlPrefix: string,
-    uname: string,
-    setUname: (username: string) => void,
-    connect: () => Promise<void>,
+    connect: (username: string, password: string) => Promise<void>,
 }) {
     const [localBaseUrl, setLocalBaseUrl] = useState(baseUrl);
     const [localUrlPrefix, setLocalUrlPrefix] = useState(urlPrefix);
-    const [localPassword, setLocalPassword] = useState(password);
+    const [localPassword, setLocalPassword] = useState("");
     const [loading, setLoading] = useState(false);
-    const [username, setUsername] = useState(uname);
+    const [username, setUsername] = useState("");
 
     useEffect(() => {
         if (localBaseUrl && username && localPassword) {
             handleLogin();
         }
+        let e = async () => {
+            // @ts-ignore
+            setUsername(await getUsername());
+            // @ts-ignore
+            setLocalPassword(await getPassword());
+        };
+        e().then();
     }, []);
 
     function handleLogin() {
@@ -61,9 +61,7 @@ export default function LoginPage({
 
         setLoading(true);
         setBaseUrl(localBaseUrl, localUrlPrefix);
-        setPassword(localPassword);
-        setUname(username);
-        connect().then(() => {
+        connect(username, localPassword).then(() => {
             setLoading(false);
         }).catch(() => {
             setLoading(false);

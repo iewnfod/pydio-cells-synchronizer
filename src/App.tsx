@@ -4,9 +4,8 @@ import {createBrowserRouter, RouterProvider} from "react-router-dom";
 import LoginPage from "./pages/LoginPage.tsx";
 import {
     BASE_URL_STORAGE_KEY,
-    getValueFromStorage, PASSWORD_STORAGE_KEY,
+    getValueFromStorage,
     URL_PREFIX_STORAGE_KEY,
-    USERNAME_STORAGE_KEY
 } from "./constants.ts";
 import toast, {Toaster} from "react-hot-toast";
 import {callBackend} from "./Utils.ts";
@@ -15,9 +14,7 @@ import TaskPage from "./pages/TaskPage.tsx";
 function App() {
     const [baseUrl, _setBaseUrl] = useState(getValueFromStorage(BASE_URL_STORAGE_KEY, ""));
     const [urlPrefix, _setUrlPrefix] = useState(getValueFromStorage(URL_PREFIX_STORAGE_KEY, "https://"));
-    const [password, _setPassword] = useState(getValueFromStorage(PASSWORD_STORAGE_KEY, ""));
     const [fullUrl, setFullUrl] = useState<URL>(new URL(urlPrefix + baseUrl));
-    const [username, _setUsername] = useState(getValueFromStorage(USERNAME_STORAGE_KEY, ""));
 
     function setBaseUrl(baseUrl: string, urlPrefix: string) {
         let full = `${urlPrefix}${baseUrl}`;
@@ -28,17 +25,7 @@ function App() {
         setFullUrl(new URL(full));
     }
 
-    function setPassword(password: string) {
-        localStorage.setItem(PASSWORD_STORAGE_KEY, password);
-        _setPassword(password);
-    }
-
-    function setUsername(username: string) {
-        localStorage.setItem(USERNAME_STORAGE_KEY, username);
-        _setUsername(username);
-    }
-
-    async function connect() {
+    async function connect(username: string, password: string) {
         try {
             let loginRes = await callBackend("login", {
                 endpoint: fullUrl.toString(),
@@ -63,18 +50,12 @@ function App() {
                 baseUrl={baseUrl}
                 setBaseUrl={setBaseUrl}
                 urlPrefix={urlPrefix}
-                password={password}
-                setPassword={setPassword}
-                uname={username}
-                setUname={setUsername}
                 connect={connect}
             />,
         },
         {
             path: "/tasks",
-            element: <TaskPage
-                setPassword={setPassword}
-            />
+            element: <TaskPage/>
         }
     ]);
 

@@ -2,6 +2,7 @@ use std::{collections::{HashMap, VecDeque}, path::PathBuf, str::FromStr, sync::M
 
 use aws_config::{AppName, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_s3::{config::{Credentials, SharedCredentialsProvider}, error::SdkError, primitives::ByteStream, Client};
+use keyring::Entry;
 use lazy_static::lazy_static;
 use serde_json::json;
 use surf::StatusCode;
@@ -10,11 +11,13 @@ use walkdir::WalkDir;
 
 use crate::{etag::calculate_etag, structs::{parse_json, BulkMetaData, BulkNode, CommandResponse, SessionData, SyncTask, TaskData, TaskProgress, UserData}};
 
+const PACKAGE_NAME: &str = "com.iewnfod.pydio.cells.synchronizer";
+const USERNAME_KEY: &str = "username";
+const PASSWORD_KEY: &str = "password";
+
 const BUCKET_NAME: &str = "io";
 
 static mut ENDPOINT: String = String::new();
-static mut USERNAME: String = String::new();
-static mut PASSWORD: String = String::new();
 
 lazy_static! {
 	pub static ref SESSION: Mutex<SessionData> = Mutex::new(SessionData::default());
@@ -37,6 +40,54 @@ fn get_endpoint() -> String {
 fn get_jwt() -> String {
 	let session = SESSION.lock().unwrap();
 	session.JWT.clone()
+}
+
+fn _get_key(key: &str) -> String {
+	let entry = Entry::new(
+		format!("{}:{}", PACKAGE_NAME, key).as_str(),
+		PACKAGE_NAME
+	).unwrap();
+	let value = entry.get_password();
+	match value {
+		Ok(v) => v,
+		Err(_) => String::new()
+	}
+}
+
+fn _set_key(key: &str, value: &str) {
+	let entry = Entry::new(
+		format!("{}:{}", PACKAGE_NAME, key).as_str(),
+		PACKAGE_NAME
+	).unwrap();
+	let _ = entry.set_password(value);
+}
+
+#[tauri::command]
+pub fn get_username() -> String {
+	let u = _get_key(USERNAME_KEY);
+	println!("Get username successfully");
+	u
+}
+
+#[tauri::command]
+pub fn get_password() -> String {
+	let p = _get_key(PASSWORD_KEY);
+	println!("Get password successfully");
+	p
+}
+
+#[tauri::command]
+pub fn set_username(value: String) -> String {
+	_set_key(USERNAME_KEY, &value);
+	println!("Save username successfully");
+	CommandResponse::ok("").to_string()
+}
+
+#[tauri::command]
+pub fn set_password(value: String) -> String {
+	_set_key(PASSWORD_KEY, &value);
+	println!("Save password successfully");
+	CommandResponse::ok("").to_string()
 }
 
 async fn solve_res(res: Result<surf::Response, surf::Error>) -> Result<surf::Response, surf::Error> {
@@ -88,8 +139,9 @@ async fn get<T: ToString>(api: T) -> Result<surf::Response, surf::Error> {
 pub async fn connect(endpoint: String, username: String) -> String {
 	unsafe {
 		ENDPOINT = endpoint.clone();
-		USERNAME = username.clone();
 	}
+
+	set_username(username.clone());
 
 	let res = get(format!("/a/user/{}", username.to_lowercase())).await;
 	if res.is_ok() {
@@ -137,9 +189,10 @@ pub async fn list(p: String) -> String {
 pub async fn login(endpoint: String, username: String, password: String) -> String {
 	unsafe {
 		ENDPOINT = endpoint.clone();
-		USERNAME = username.clone();
-		PASSWORD = password.clone();
 	}
+
+	set_username(username.clone());
+	set_password(password.clone());
 
 	let res = post_without_bearer(
 		"/a/frontend/session",
@@ -373,11 +426,12 @@ pub fn progress(uuid: String) -> String {
 }
 
 async fn refresh_login() {
-	login(unsafe {
+	println!("Refresh Login");
+	login(
+		unsafe {
 			ENDPOINT.clone()
-		}, unsafe {
-			USERNAME.clone()
-		}, unsafe {
-			PASSWORD.clone()
-		}).await;
+		},
+		get_username(),
+		get_password()
+	).await;
 }

@@ -42,7 +42,11 @@ fn main() {
             login,
             sync,
             pause,
-            progress
+            progress,
+            get_username,
+            get_password,
+            set_username,
+            set_password
         ])
         .build(tauri::generate_context!()).unwrap();
 
