@@ -5,8 +5,11 @@
 mod net;
 mod structs;
 mod etag;
+mod data;
 
+use data::{get_saved_settings, save_settings};
 use net::*;
+use structs::{parse_json, Settings};
 use tauri::{
     AppHandle, CustomMenuItem, Manager, RunEvent, SystemTray,
     SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem, WindowEvent,
@@ -70,7 +73,17 @@ fn tray_event(app_handle: &AppHandle, event: SystemTrayEvent) {
 }
 
 fn main() {
-    let mut app = tauri::Builder::default()
+    let settings = get_saved_settings();
+
+    let mut builder = tauri::Builder::default()
+        .setup(|app| {
+            app.listen_global("update-settings", |event| {
+                let data = event.payload().unwrap();
+                let new_settings: Settings = parse_json(data);
+                save_settings(new_settings);
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             connect,
             list,
@@ -82,10 +95,15 @@ fn main() {
             get_password,
             set_username,
             set_password
-        ])
-        .system_tray(build_tray())
-        .on_system_tray_event(tray_event)
-        .build(tauri::generate_context!()).unwrap();
+        ]);
+
+    if settings.showTrayIcon {
+        builder = builder
+            .system_tray(build_tray())
+            .on_system_tray_event(tray_event);
+    }
+
+    let mut app = builder.build(tauri::generate_context!()).unwrap();
 
     #[cfg(target_os="macos")]
     app.set_activation_policy(tauri::ActivationPolicy::Accessory);

@@ -4,7 +4,7 @@ import {
     DialogContent,
     DialogTitle,
     Divider,
-    Drawer, FormControl, FormLabel,
+    Drawer, FormControl, FormHelperText, FormLabel,
     IconButton,
     ModalClose,
     Sheet,
@@ -20,18 +20,22 @@ const generalControls = [
     {
         label: 'Start with login',
         property:'startWithLogin',
+        restart: false
     },
     {
         label: 'Show tray icon',
         property:'showTrayIcon',
+        restart: true
     },
     {
         label: 'Upload when using battery',
         property: 'continueWhenUsingBattery',
+        restart: false
     },
     {
         label: 'Notify you when upload failed',
         property: 'notificationWhenFailed',
+        restart: false
     },
 ];
 
@@ -112,6 +116,16 @@ export default function SettingDrawerWithIconButton({
                                             <FormLabel sx={{ typography: 'title-sm' }}>
                                                 {control.label}
                                             </FormLabel>
+                                            <FormHelperText sx={{
+                                                mt: 0,
+                                                userSelect: 'none'
+                                            }}>
+                                                {
+                                                    control.restart
+                                                        ? "Restart is needed to activate this configuration."
+                                                        : ""
+                                                }
+                                            </FormHelperText>
                                         </Box>
                                         <Switch checked={
                                             //@ts-ignore

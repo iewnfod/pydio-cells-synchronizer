@@ -11,7 +11,7 @@ use walkdir::WalkDir;
 
 use crate::{etag::calculate_etag, structs::{parse_json, BulkMetaData, BulkNode, CommandResponse, SessionData, SyncTask, TaskData, TaskProgress, UserData}};
 
-const PACKAGE_NAME: &str = "com.iewnfod.pydio.cells.synchronizer";
+pub const PACKAGE_NAME: &str = "com.iewnfod.pydio.cells.synchronizer";
 const USERNAME_KEY: &str = "username";
 const PASSWORD_KEY: &str = "password";
 

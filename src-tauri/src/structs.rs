@@ -116,6 +116,33 @@ pub struct TaskProgress {
 	pub current: usize
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Settings {
+	pub startWithLogin: bool,
+	pub showTrayIcon: bool,
+	pub globalIgnores: Vec<String>,
+	pub continueWhenUsingBattery: bool,
+	pub notificationWhenFailed: bool
+}
+
+impl ToString for Settings {
+	fn to_string(&self) -> String {
+		json!(self).to_string()
+	}
+}
+
+impl Default for Settings {
+	fn default() -> Self {
+		Self {
+			startWithLogin: false,
+			showTrayIcon: true,
+			globalIgnores: vec![],
+			continueWhenUsingBattery: true,
+			notificationWhenFailed: false
+		}
+	}
+}
+
 pub fn parse_json<'a, T: Default + Deserialize<'a>>(data: &'a str) -> T {
 	let result: Result<T, serde_json::Error> = serde_json::from_str(data);
 	match result {

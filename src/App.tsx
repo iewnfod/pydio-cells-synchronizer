@@ -1,5 +1,5 @@
 import {Box, Grid} from "@mui/joy";
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {createBrowserRouter, RouterProvider} from "react-router-dom";
 import LoginPage from "./pages/LoginPage.tsx";
 import {
@@ -11,6 +11,7 @@ import toast, {Toaster} from "react-hot-toast";
 import {callBackend} from "./Utils.ts";
 import TaskPage from "./pages/TaskPage.tsx";
 import {Settings} from "./interfaces.ts";
+import {emit} from "@tauri-apps/api/event";
 
 function App() {
     const [baseUrl, _setBaseUrl] = useState(getValueFromStorage(BASE_URL_STORAGE_KEY, ""));
@@ -19,6 +20,10 @@ function App() {
     const [settings, _setSettings] = useState<Settings>(
         JSON.parse(getValueFromStorage(SETTINGS_STORAGE_KEY, JSON.stringify(DEFAULT_SETTINGS)))
     );
+
+    useEffect(() => {
+        emit("update-settings", settings).then().catch();
+    }, []);
 
     function setBaseUrl(baseUrl: string, urlPrefix: string) {
         let full = `${urlPrefix}${baseUrl}`;
@@ -31,6 +36,7 @@ function App() {
 
     function setSettings(newSettings: Settings) {
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
+        emit("update-settings", JSON.stringify(settings)).then().catch();
         _setSettings(newSettings);
     }
 
