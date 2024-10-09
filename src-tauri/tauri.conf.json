@@ -23,6 +23,10 @@
         "all": true
       }
     },
+    "systemTray": {
+      "iconPath": "icons/tray.png",
+      "iconAsTemplate": true
+    },
     "windows": [
       {
         "title": "Cells Synchronizer",
