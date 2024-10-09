@@ -19,6 +19,15 @@ impl<T: Default+Serialize> CommandResponse<T> {
 	}
 }
 
+impl CommandResponse<()> {
+	pub fn empty_ok() -> Self {
+		Self { success: true, data: (), message: "".to_string() }
+	}
+	pub fn empty_err() -> Self {
+		Self { success: false, data: (), message: "".to_string() }
+	}
+}
+
 impl<T: Default+Serialize> ToString for CommandResponse<T> {
 	fn to_string(&self) -> String {
 		json!(self).to_string()

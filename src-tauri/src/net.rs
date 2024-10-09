@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet, VecDeque}, path::PathBuf, str::FromStr, sync::Mutex, thread::sleep, time::Duration};
+use std::{collections::{HashMap, VecDeque}, path::PathBuf, str::FromStr, sync::Mutex, thread::sleep, time::Duration};
 
 use aws_config::{AppName, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_s3::{config::{Credentials, SharedCredentialsProvider}, error::SdkError, primitives::ByteStream, Client};
@@ -85,14 +85,14 @@ pub fn get_password() -> String {
 pub fn set_username(value: String) -> String {
 	_set_key(USERNAME_KEY, &value);
 	println!("Save username successfully");
-	CommandResponse::ok("").to_string()
+	CommandResponse::empty_ok().to_string()
 }
 
 #[tauri::command]
 pub fn set_password(value: String) -> String {
 	_set_key(PASSWORD_KEY, &value);
 	println!("Save password successfully");
-	CommandResponse::ok("").to_string()
+	CommandResponse::empty_ok().to_string()
 }
 
 async fn solve_res(res: Result<surf::Response, surf::Error>) -> Result<surf::Response, surf::Error> {
@@ -243,7 +243,7 @@ pub async fn sync(task: TaskData, ignores: Vec<String>) -> String {
 		if uuid == &task.uuid {
 			if !handler.inner().is_finished() {
 				println!("Task {} is already running", uuid);
-				return CommandResponse::<()>::err("").to_string();
+				return CommandResponse::empty_err().to_string();
 			} else {
 				pause(uuid.clone());
 				break;
@@ -268,7 +268,7 @@ pub async fn sync(task: TaskData, ignores: Vec<String>) -> String {
 		handlers.insert(task.uuid.clone(), handler);
 	}
 
-	CommandResponse::<()>::ok(()).to_string()
+	CommandResponse::empty_ok().to_string()
 }
 
 async fn _sync(
@@ -429,7 +429,7 @@ pub fn pause(uuid: String) -> String {
 		handlers.remove(&uuid);
 		task_progress.remove(&uuid);
 	}
-	CommandResponse::<()>::ok(()).to_string()
+	CommandResponse::empty_ok().to_string()
 }
 
 #[tauri::command]
@@ -441,7 +441,7 @@ pub fn progress(uuid: String) -> String {
 		}
 		CommandResponse::ok(progress.clone()).to_string()
 	} else {
-		CommandResponse::<()>::err("").to_string()
+		CommandResponse::empty_err().to_string()
 	}
 }
 
