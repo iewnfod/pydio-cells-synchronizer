@@ -8,7 +8,7 @@ mod etag;
 
 use net::*;
 use tauri::{
-    App, AppHandle, Builder, CustomMenuItem, Manager, RunEvent, Runtime, SystemTray,
+    AppHandle, CustomMenuItem, Manager, RunEvent, SystemTray,
     SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem, WindowEvent,
 };
 
