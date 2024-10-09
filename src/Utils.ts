@@ -44,3 +44,9 @@ export async function getUsername() {
 export async function getPassword() {
     return await invoke("get_password") || "";
 }
+
+export function handleLogout() {
+    callBackend("set_username", {value: ""}).then();
+    callBackend("set_password", {value: ""}).then();
+    window.location.href = "/";
+}

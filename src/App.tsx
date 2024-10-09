@@ -3,18 +3,22 @@ import {useState} from "react";
 import {createBrowserRouter, RouterProvider} from "react-router-dom";
 import LoginPage from "./pages/LoginPage.tsx";
 import {
-    BASE_URL_STORAGE_KEY,
-    getValueFromStorage,
+    BASE_URL_STORAGE_KEY, DEFAULT_SETTINGS,
+    getValueFromStorage, SETTINGS_STORAGE_KEY,
     URL_PREFIX_STORAGE_KEY,
 } from "./constants.ts";
 import toast, {Toaster} from "react-hot-toast";
 import {callBackend} from "./Utils.ts";
 import TaskPage from "./pages/TaskPage.tsx";
+import {Settings} from "./interfaces.ts";
 
 function App() {
     const [baseUrl, _setBaseUrl] = useState(getValueFromStorage(BASE_URL_STORAGE_KEY, ""));
     const [urlPrefix, _setUrlPrefix] = useState(getValueFromStorage(URL_PREFIX_STORAGE_KEY, "https://"));
     const [fullUrl, setFullUrl] = useState<URL>(new URL(urlPrefix + baseUrl));
+    const [settings, _setSettings] = useState<Settings>(
+        JSON.parse(getValueFromStorage(SETTINGS_STORAGE_KEY, JSON.stringify(DEFAULT_SETTINGS)))
+    );
 
     function setBaseUrl(baseUrl: string, urlPrefix: string) {
         let full = `${urlPrefix}${baseUrl}`;
@@ -23,6 +27,11 @@ function App() {
         _setBaseUrl(baseUrl);
         _setUrlPrefix(urlPrefix);
         setFullUrl(new URL(full));
+    }
+
+    function setSettings(newSettings: Settings) {
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
+        _setSettings(newSettings);
     }
 
     async function connect(username: string, password: string) {
@@ -55,7 +64,10 @@ function App() {
         },
         {
             path: "/tasks",
-            element: <TaskPage/>
+            element: <TaskPage
+                settings={settings}
+                setSettings={setSettings}
+            />
         }
     ]);
 

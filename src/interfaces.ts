@@ -44,3 +44,11 @@ export interface TimeUnit {
     name: string,
     level: number,
 }
+
+export interface Settings {
+    startWithLogin: boolean,
+    showTrayIcon: boolean,
+    globalIgnores: string[],
+    continueWhenUsingBattery: boolean,
+    notificationWhenFailed: boolean,
+}

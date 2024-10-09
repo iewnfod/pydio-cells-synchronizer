@@ -3,18 +3,16 @@ import {
     Button,
     ButtonGroup,
     Chip,
-    FormLabel,
     IconButton,
     LinearProgress,
     Sheet,
     Table,
     Typography
 } from "@mui/joy";
-import {Task} from "../interfaces.ts";
+import {Settings, Task} from "../interfaces.ts";
 import {useEffect, useState} from "react";
 import {
     getValueFromStorage,
-    GLOABL_IGNORES_STORAGE_KEY,
     LARGE_PART,
     PAD,
     SMALL_PART,
@@ -28,16 +26,19 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import PauseIcon from '@mui/icons-material/Pause';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import EditTaskModalWithButton from "../modals/EditTaskModal.tsx";
-import {callBackend} from "../Utils.ts";
-import IgnoresInput from "../components/IgnoresInput.tsx";
+import {callBackend, handleLogout} from "../Utils.ts";
 import React from "react";
+import SettingDrawerWithIconButton from "../modals/SettingDrawer.tsx";
 
-export default function TaskPage() {
+export default function TaskPage({
+    settings,
+    setSettings
+} : {
+    settings: Settings,
+    setSettings: (newSettings: Settings) => void;
+}) {
     const [tasks, _setTasks] = useState<Task[]>(
         JSON.parse(getValueFromStorage(TASKS_STORAGE_KEY, "[]"))
-    );
-    const [globalIgnores, _setGlobalIgnores] = useState<string[]>(
-        JSON.parse(getValueFromStorage(GLOABL_IGNORES_STORAGE_KEY, "[]"))
     );
 
     const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -52,11 +53,6 @@ export default function TaskPage() {
         });
     }, []);
 
-    function setGlobalIgnores(ignores: string[]) {
-        localStorage.setItem(GLOABL_IGNORES_STORAGE_KEY, JSON.stringify(ignores));
-        _setGlobalIgnores(ignores);
-    }
-
     function setTasks(newTasks: Task[]) {
         localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(newTasks));
         _setTasks(newTasks);
@@ -68,12 +64,6 @@ export default function TaskPage() {
 
     function createTask(newTask: Task) {
         setTasks([...tasks, newTask])
-    }
-
-    function handleLogout() {
-        callBackend("set_username", {value: ""}).then();
-        callBackend("set_password", {value: ""}).then();
-        window.location.href = "/";
     }
 
     function handlePlay(task: Task) {
@@ -89,7 +79,7 @@ export default function TaskPage() {
         console.log("sync", task.uuid);
         callBackend("sync", {
             task: task,
-            ignores: globalIgnores,
+            ignores: settings.globalIgnores,
         }).then(() => {
             getProgress(task.uuid);
             let ts: Task[] = JSON.parse(getValueFromStorage(TASKS_STORAGE_KEY, JSON.stringify(tasks)));
@@ -177,7 +167,7 @@ export default function TaskPage() {
     }
 
     return (
-        <Box sx={{height: '90vh', display: 'flex', flexDirection: 'column', gap: PAD, overflow: 'hidden'}}>
+        <Box sx={{height: '90vh', display: 'flex', flexDirection: 'column', gap: PAD, overflow: 'hidden', width: '100%'}}>
             <Box sx={{
                 pl: PAD, pr: PAD, pb: PAD,
                 display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
@@ -192,6 +182,10 @@ export default function TaskPage() {
                     >
                         New Task
                     </Button>
+                    <SettingDrawerWithIconButton
+                        settings={settings}
+                        setSettings={setSettings}
+                    />
                     <IconButton onClick={() => handleLogout()}>
                         <LogoutIcon/>
                     </IconButton>
@@ -204,7 +198,6 @@ export default function TaskPage() {
                 }}>
                 <Table
                     stickyHeader
-                    stickyFooter
                     sx={{
                         pl: PAD, pr: PAD, pb: PAD,
                         '& tr > :last-child': { textAlign: 'right' },
@@ -328,18 +321,6 @@ export default function TaskPage() {
                         </React.Fragment>
                     ))}
                     </tbody>
-                    <tfoot>
-                    <tr>
-                        <td colSpan={5} style={{textAlign: 'center'}}>
-                            <Box sx={{width: '100%', pb: PAD}}>
-                                <FormLabel sx={{p: PAD / 2}}>
-                                    Global Ignore
-                                </FormLabel>
-                                <IgnoresInput ignores={globalIgnores} setIgnores={setGlobalIgnores}/>
-                            </Box>
-                        </td>
-                    </tr>
-                    </tfoot>
                 </Table>
                 </Box>
             </Sheet>

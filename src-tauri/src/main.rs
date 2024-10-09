@@ -70,7 +70,7 @@ fn tray_event(app_handle: &AppHandle, event: SystemTrayEvent) {
 }
 
 fn main() {
-    let app = tauri::Builder::default()
+    let mut app = tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             connect,
             list,
@@ -86,6 +86,9 @@ fn main() {
         .system_tray(build_tray())
         .on_system_tray_event(tray_event)
         .build(tauri::generate_context!()).unwrap();
+
+    #[cfg(target_os="macos")]
+    app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
     app.run(main_loop);
 }

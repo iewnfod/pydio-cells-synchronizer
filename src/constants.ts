@@ -1,5 +1,5 @@
 import {randomNum} from "./Utils.ts";
-import {TimeUnit} from "./interfaces.ts";
+import {Settings, TimeUnit} from "./interfaces.ts";
 
 export const ASPECT_RATIO = 1/0.618;
 export const SMALL_PART = 38.2;
@@ -21,6 +21,7 @@ export const USERNAME_STORAGE_KEY = 'username';
 export const USER_DATA_STORAGE_KEY = 'userData';
 export const TASKS_STORAGE_KEY = 'tasks';
 export const GLOABL_IGNORES_STORAGE_KEY = 'ignores';
+export const SETTINGS_STORAGE_KEY = 'settings';
 
 export function getValueFromStorage(key: string, defaultValue: any) {
     return localStorage.getItem(key) || defaultValue;
@@ -56,4 +57,12 @@ export const UNITS: TimeUnit[] = [
 export const TYPOGRAPHY_OVERFLOW_SX = {
     overflow: 'hidden',
     textOverflow: 'ellipsis'
+}
+
+export const DEFAULT_SETTINGS: Settings = {
+    startWithLogin: false,
+    showTrayIcon: true,
+    globalIgnores: [],
+    continueWhenUsingBattery: true,
+    notificationWhenFailed: false,
 }
