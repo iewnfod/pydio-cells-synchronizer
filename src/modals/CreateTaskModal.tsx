@@ -70,7 +70,7 @@ export default function CreateTaskModal({
             localDir: localPath,
             remoteDir: remoteNode,
             ignores: ignores,
-            paused: false,
+            paused: true,
             repeatInterval: interval,
             repeatIntervalUnit: intervalUnit
         };

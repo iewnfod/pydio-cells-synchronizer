@@ -304,16 +304,10 @@ async fn _sync(
 		}
 	}
 
-	new_progress(&uuid, sync_tasks.len());
-
-	let mut finished_tasks: HashSet<PathBuf> = HashSet::new();
+	let mut progress = new_progress(&uuid, sync_tasks.len());
 
 	// upload
 	'upload_loop: while let Some(sync_task) = sync_tasks.pop_front() {
-		if finished_tasks.contains(&sync_task.from) {
-			continue 'upload_loop;
-		}
-
 		let body = ByteStream::from_path(&sync_task.from).await;
 		if body.is_ok() {
 			let this_node = post(
@@ -332,9 +326,10 @@ async fn _sync(
 					let etag = calculate_etag(&sync_task.from);
 					if let Ok(tag) = etag {
 						if node_data.Nodes[0].Etag == tag {
-							let progress = progress_add_one(&uuid);
-							finished_tasks.insert(sync_task.from.clone());
+							progress.current += 1;
+							update_progress(&uuid, progress);
 							println!("Skip {:?} {}/{}", sync_task.from, progress.current, progress.total);
+							sleep(Duration::from_millis(100));
 							continue 'upload_loop;
 						}
 					}
@@ -346,20 +341,20 @@ async fn _sync(
 			let session = get_session();
 
 			let config = SdkConfig::builder()
-			.endpoint_url(get_endpoint())
-			.app_name(AppName::new("s3").unwrap())
-			.behavior_version(BehaviorVersion::latest())
-			.region(Region::new("auto"))
-			.credentials_provider(
-				SharedCredentialsProvider::new(
-					Credentials::new(
-						session.Token.AccessToken,
-						session.Token.IDToken,
-						None, None,
-						"cells"
+				.endpoint_url(get_endpoint())
+				.app_name(AppName::new("s3").unwrap())
+				.behavior_version(BehaviorVersion::latest())
+				.region(Region::new("auto"))
+				.credentials_provider(
+					SharedCredentialsProvider::new(
+						Credentials::new(
+							session.Token.AccessToken,
+							session.Token.IDToken,
+							None, None,
+							"cells"
+						)
 					)
-				)
-			).build();
+				).build();
 
 			let s3_client = Client::new(&config);
 
@@ -373,16 +368,25 @@ async fn _sync(
 
 			match res {
 				Ok(_) => {
-					let progress = progress_add_one(&uuid);
-					finished_tasks.insert(sync_task.from.clone());
+					progress.current += 1;
+					update_progress(&uuid, progress);
 					println!("Success {}/{}", progress.current, progress.total);
 				},
 				Err(e) => {
 					println!("Failed: {:?}", &e);
 					match e {
 						SdkError::ServiceError(se) => {
-							if se.err().meta().code().unwrap() == "AccessDenied" {
-								refresh_login().await;
+							match se.err().meta().code().unwrap() {
+								"AccessDenied" => {
+									refresh_login().await;
+								},
+								"NotImplemented" => {
+									progress.current += 1;
+									update_progress(&uuid, progress);
+									println!("Empty file {:?} {}/{}", sync_task.from, progress.current, progress.total);
+									continue 'upload_loop;
+								},
+								_ => {}
 							}
 						},
 						_ => {}
@@ -399,14 +403,12 @@ async fn _sync(
 	pause(uuid.clone());
 }
 
-fn progress_add_one(uuid: &str) -> TaskProgress {
+fn update_progress(uuid: &str, new_progress: TaskProgress) {
 	let mut progresses = SYNC_PROGRESS.lock().unwrap();
-	let mut p = TaskProgress::default();
 	if let Some(progress) = progresses.get_mut(uuid) {
-		progress.current += 1;
-		p = progress.clone();
+		progress.current = new_progress.current;
+		progress.total = new_progress.total;
 	}
-	p
 }
 
 fn new_progress(uuid: &str, total: usize) -> TaskProgress {

@@ -136,6 +136,10 @@ export default function TaskPage() {
     }
     
     function handleDelete(task: Task) {
+        callBackend("pause", {
+            uuid: task.uuid,
+        }).then().catch();
+
         let newTasks = JSON.parse(JSON.stringify(tasks));
         if (tasks.indexOf(task) !== -1) {
             newTasks.splice(tasks.indexOf(task), 1);
