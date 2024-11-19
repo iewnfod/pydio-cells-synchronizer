@@ -116,13 +116,20 @@ pub struct TaskProgress {
 	pub current: usize
 }
 
+impl TaskProgress {
+	pub fn increase(&mut self) {
+		self.current += 1;
+	}
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Settings {
 	pub startWithLogin: bool,
 	pub showTrayIcon: bool,
 	pub globalIgnores: Vec<String>,
 	pub continueWhenUsingBattery: bool,
-	pub notificationWhenFailed: bool
+	pub notificationWhenFailed: bool,
+	pub uploadThreadNumber: usize,
 }
 
 impl ToString for Settings {
@@ -138,7 +145,8 @@ impl Default for Settings {
 			showTrayIcon: true,
 			globalIgnores: vec![],
 			continueWhenUsingBattery: true,
-			notificationWhenFailed: false
+			notificationWhenFailed: false,
+			uploadThreadNumber: 8
 		}
 	}
 }

@@ -6,10 +6,10 @@ use keyring::Entry;
 use lazy_static::lazy_static;
 use serde_json::json;
 use surf::StatusCode;
-use tauri::async_runtime::JoinHandle;
+use tokio::{sync::Semaphore, task::JoinHandle};
 use walkdir::WalkDir;
 
-use crate::{etag::calculate_etag, structs::{parse_json, BulkMetaData, BulkNode, CommandResponse, SessionData, SyncTask, TaskData, TaskProgress, UserData}};
+use crate::{data::get_saved_settings, etag::calculate_etag, structs::{parse_json, BulkMetaData, BulkNode, CommandResponse, SessionData, SyncTask, TaskData, TaskProgress, UserData}};
 
 pub const PACKAGE_NAME: &str = "com.iewnfod.pydio.cells.synchronizer";
 const USERNAME_KEY: &str = "username";
@@ -241,7 +241,7 @@ pub async fn sync(task: TaskData, ignores: Vec<String>) -> String {
 	let handlers = SYNC_HANDLERS.lock().unwrap();
 	for (uuid, handler) in handlers.iter() {
 		if uuid == &task.uuid {
-			if !handler.inner().is_finished() {
+			if !handler.is_finished() {
 				println!("Task {} is already running", uuid);
 				return CommandResponse::empty_err().to_string();
 			} else {
@@ -256,7 +256,7 @@ pub async fn sync(task: TaskData, ignores: Vec<String>) -> String {
 		let all_ignores = [&ignores.clone()[..], &task.ignores[..]].concat();
 		let uuid = task.uuid.clone();
 		println!("Sync Task {:?}", &task);
-		let handler = tauri::async_runtime::spawn(async move {
+		let handler = tokio::spawn(async move {
 			_sync(
 				task.localDir,
 				task.remoteDir,
@@ -279,6 +279,8 @@ async fn _sync(
 	if !local_path.exists() {
 		return ;
 	}
+
+	let settings = get_saved_settings();
 
 	let walk = WalkDir::new(&local_path);
 	let mut sync_tasks: VecDeque<SyncTask> = VecDeque::new();
@@ -308,108 +310,128 @@ async fn _sync(
 		}
 	}
 
-	let mut progress = new_progress(&uuid, sync_tasks.len());
+	let total = sync_tasks.len();
 
-	// upload
-	'upload_loop: while let Some(sync_task) = sync_tasks.pop_front() {
-		let body = ByteStream::from_path(&sync_task.from).await;
-		if body.is_ok() {
-			let this_node = post(
-				"/a/meta/bulk/get",
-				json!({
-					"NodePaths": [
-						&sync_task.to
-					]
-				}).to_string()
-			).await;
+	while sync_tasks.len() > 0 {
+		let semaphore = Semaphore::new(settings.uploadThreadNumber);
+		let new_tasks: Mutex<Vec<SyncTask>> = Mutex::new(vec![]);
 
-			if let Ok(mut node) = this_node {
-				let t = node.body_string().await.unwrap();
-				let node_data: BulkMetaData = parse_json(&t);
-				if node_data.Nodes.len() > 0 {
-					let etag = calculate_etag(&sync_task.from);
-					if let Ok(tag) = etag {
-						if node_data.Nodes[0].Etag == tag {
-							progress.current += 1;
-							update_progress(&uuid, progress);
-							println!("Skip {:?} {}/{}", sync_task.from, progress.current, progress.total);
-							sleep(Duration::from_millis(100));
-							continue 'upload_loop;
-						}
-					}
-				}
+		for t in sync_tasks.clone() {
+			// 获取许可
+			let permit = semaphore.acquire().await.unwrap();
+			// 运行同步
+			let success = _sync_single(t.clone()).await;
+			if success {
+				let mut p = get_progress(uuid.clone(), total);
+				p.increase();
+				println!("{}/{}", p.current, p.total);
+				update_progress(&uuid, p);
+			} else {
+				let mut tasks = new_tasks.lock().unwrap();
+				tasks.push(t.clone());
 			}
+			drop(permit);
+		}
 
-			println!("Putting {} to {}", &sync_task.from.to_str().unwrap(), &sync_task.to);
-
-			let session = get_session();
-
-			let config = SdkConfig::builder()
-				.endpoint_url(get_endpoint())
-				.app_name(AppName::new("s3").unwrap())
-				.behavior_version(BehaviorVersion::latest())
-				.region(Region::new("auto"))
-				.credentials_provider(
-					SharedCredentialsProvider::new(
-						Credentials::new(
-							session.Token.AccessToken,
-							session.Token.IDToken,
-							None, None,
-							"cells"
-						)
-					)
-				).build();
-
-			let s3_client = Client::new(&config);
-
-			let res = s3_client
-				.put_object()
-				.bucket(BUCKET_NAME)
-				.key(&sync_task.to)
-				.body(body.unwrap())
-				.send()
-				.await;
-
-			match res {
-				Ok(_) => {
-					progress.current += 1;
-					update_progress(&uuid, progress);
-					println!("Success {}/{}", progress.current, progress.total);
-				},
-				Err(e) => {
-					println!("Failed: {:?}", &e);
-					match e {
-						SdkError::ServiceError(se) => {
-							let err = se.err().meta();
-							if let Some(code) = err.code() {
-								match code {
-									"AccessDenied" => {
-										refresh_login().await;
-									},
-									"NotImplemented" => {
-										progress.current += 1;
-										update_progress(&uuid, progress);
-										println!("Empty file {:?} {}/{}", sync_task.from, progress.current, progress.total);
-										continue 'upload_loop;
-									},
-									_ => {}
-								}
-							} else {
-								println!("Unknown error: {:?}", err);
-							}
-						},
-						_ => {}
-					};
-					sync_tasks.push_back(sync_task.clone());
-				}
-			}
-			sleep(Duration::from_secs(1));
-		} else {
-			println!("Failed to read file: {:?}", &body.err());
+		sync_tasks.clear();
+		let tasks = new_tasks.lock().unwrap();
+		for task in tasks.iter() {
+			sync_tasks.push_back(task.clone());
 		}
 	}
 
 	pause(uuid.clone());
+}
+
+async fn _sync_single(sync_task: SyncTask) -> bool {
+	let body = ByteStream::from_path(&sync_task.from).await;
+	if body.is_ok() {
+		let this_node = post(
+			"/a/meta/bulk/get",
+			json!({
+				"NodePaths": [
+					&sync_task.to
+				]
+			}).to_string()
+		).await;
+
+		if let Ok(mut node) = this_node {
+			let t = node.body_string().await.unwrap();
+			let node_data: BulkMetaData = parse_json(&t);
+			if node_data.Nodes.len() > 0 {
+				let etag = calculate_etag(&sync_task.from);
+				if let Ok(tag) = etag {
+					if node_data.Nodes[0].Etag == tag {
+						println!("Skip {:?}", &sync_task.from);
+						sleep(Duration::from_millis(100));
+						return true;
+					}
+				}
+			}
+		}
+
+		println!("Putting {} to {}", &sync_task.from.to_str().unwrap(), &sync_task.to);
+
+		let session = get_session();
+
+		let config = SdkConfig::builder()
+			.endpoint_url(get_endpoint())
+			.app_name(AppName::new("s3").unwrap())
+			.behavior_version(BehaviorVersion::latest())
+			.region(Region::new("auto"))
+			.credentials_provider(
+				SharedCredentialsProvider::new(
+					Credentials::new(
+						session.Token.AccessToken,
+						session.Token.IDToken,
+						None, None,
+						"cells"
+					)
+				)
+			).build();
+
+		let s3_client = Client::new(&config);
+
+		let res = s3_client
+			.put_object()
+			.bucket(BUCKET_NAME)
+			.key(&sync_task.to)
+			.body(body.unwrap())
+			.send()
+			.await;
+
+		match res {
+			Ok(_) => {
+				println!("Successfully upload {:?}", &sync_task.from);
+				return true;
+			},
+			Err(e) => {
+				println!("Failed uploading {:?}: \n{:?}", &sync_task.from, &e);
+				match e {
+					SdkError::ServiceError(se) => {
+						if let Some(code) = se.err().meta().code() {
+							match code {
+								"AccessDenied" => {
+									refresh_login().await;
+								},
+								"NotImplemented" => {
+									println!("Invalid file {:?}", sync_task.from);
+								},
+								_ => {}
+							}
+						} else {
+							println!("Unknown error: {:?}", &se);
+						}
+					},
+					_ => {}
+				};
+				return false;
+			}
+		}
+	} else {
+		println!("Failed to read file: {:?}", &body.err());
+		return false;
+	}
 }
 
 fn update_progress(uuid: &str, new_progress: TaskProgress) {
@@ -439,6 +461,16 @@ pub fn pause(uuid: String) -> String {
 		task_progress.remove(&uuid);
 	}
 	CommandResponse::empty_ok().to_string()
+}
+
+fn get_progress(uuid: String, total: usize) -> TaskProgress {
+	let progresses = SYNC_PROGRESS.lock().unwrap();
+	if let Some(progress) = progresses.get(&uuid) {
+		return progress.clone();
+	} else {
+		drop(progresses);
+		return new_progress(&uuid, total);
+	}
 }
 
 #[tauri::command]

@@ -84,7 +84,8 @@ fn tray_event(app_handle: &AppHandle, event: SystemTrayEvent) {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let settings = get_saved_settings();
 
     let mut builder = tauri::Builder::default()

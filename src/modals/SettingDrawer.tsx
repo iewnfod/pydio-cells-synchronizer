@@ -1,4 +1,5 @@
 import {
+    Autocomplete,
     Box,
     Button,
     DialogContent,
@@ -112,14 +113,11 @@ export default function SettingDrawerWithIconButton({
                             {
                                 generalControls.map((control, i) => (
                                     <FormControl orientation="horizontal" key={i}>
-                                        <Box sx={{ flex: 1, pr: PAD }}>
-                                            <FormLabel sx={{ typography: 'title-sm' }}>
+                                        <Box sx={{ flex: 1 }}>
+                                            <FormLabel>
                                                 {control.label}
                                             </FormLabel>
-                                            <FormHelperText sx={{
-                                                mt: 0,
-                                                userSelect: 'none'
-                                            }}>
+                                            <FormHelperText>
                                                 {
                                                     control.restart
                                                         ? "Restart is needed to activate this configuration."
@@ -138,6 +136,27 @@ export default function SettingDrawerWithIconButton({
                                     </FormControl>
                                 ))
                             }
+                            <FormControl orientation="horizontal">
+                                <Box sx={{flex: 1, textAlign: 'center'}}>
+                                    <FormLabel>
+                                        Upload Thread Number
+                                    </FormLabel>
+                                    <FormHelperText>
+                                        Number of files upload simultaneously
+                                    </FormHelperText>
+                                </Box>
+                                <Autocomplete
+                                    value={settings.uploadThreadNumber}
+                                    options={[1, 4, 8, 16, 32, 64, 128]}
+                                    onChange={(_e, v) => {
+                                        if (v) {
+                                            let newSettings: Settings = JSON.parse(JSON.stringify(localSettings));
+                                            newSettings.uploadThreadNumber = v;
+                                            setLocalSettings(newSettings);
+                                        }
+                                    }}
+                                />
+                            </FormControl>
                         </Box>
 
                         <Divider/>

@@ -51,4 +51,5 @@ export interface Settings {
     globalIgnores: string[],
     continueWhenUsingBattery: boolean,
     notificationWhenFailed: boolean,
+    uploadThreadNumber: number
 }

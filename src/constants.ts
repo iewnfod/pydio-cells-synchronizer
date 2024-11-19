@@ -65,4 +65,5 @@ export const DEFAULT_SETTINGS: Settings = {
     globalIgnores: [],
     continueWhenUsingBattery: true,
     notificationWhenFailed: false,
+    uploadThreadNumber: 8
 }
