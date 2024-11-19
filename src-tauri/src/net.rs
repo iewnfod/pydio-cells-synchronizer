@@ -310,6 +310,8 @@ async fn _sync(
 	'upload_loop: while let Some(sync_task) = sync_tasks.pop_front() {
 		let body = ByteStream::from_path(&sync_task.from).await;
 		if body.is_ok() {
+			println!("{:?}", &sync_task);
+
 			let this_node = post(
 				"/a/meta/bulk/get",
 				json!({
@@ -376,17 +378,22 @@ async fn _sync(
 					println!("Failed: {:?}", &e);
 					match e {
 						SdkError::ServiceError(se) => {
-							match se.err().meta().code().unwrap() {
-								"AccessDenied" => {
-									refresh_login().await;
-								},
-								"NotImplemented" => {
-									progress.current += 1;
-									update_progress(&uuid, progress);
-									println!("Empty file {:?} {}/{}", sync_task.from, progress.current, progress.total);
-									continue 'upload_loop;
-								},
-								_ => {}
+							let err = se.err().meta();
+							if let Some(code) = err.code() {
+								match code {
+									"AccessDenied" => {
+										refresh_login().await;
+									},
+									"NotImplemented" => {
+										progress.current += 1;
+										update_progress(&uuid, progress);
+										println!("Empty file {:?} {}/{}", sync_task.from, progress.current, progress.total);
+										continue 'upload_loop;
+									},
+									_ => {}
+								}
+							} else {
+								println!("Unknown error: {:?}", err);
 							}
 						},
 						_ => {}

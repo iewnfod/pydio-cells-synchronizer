@@ -1,0 +1,6 @@
+.task-table {
+    overflow-y: auto;
+    td {
+        padding: 1rem !important;
+    }
+}

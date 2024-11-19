@@ -104,7 +104,7 @@ export default function SettingDrawerWithIconButton({
                     <DialogTitle>Settings</DialogTitle>
                     <ModalClose />
                     <Divider sx={{ mt: 'auto' }} />
-                    <DialogContent sx={{ gap: PAD2 }}>
+                    <DialogContent sx={{ gap: PAD2, overflowX: 'hidden' }}>
                         <Box sx={{display: 'flex', flexDirection: 'column', gap: PAD }}>
                             <Typography level="title-md" sx={{ fontWeight: 'bold' }}>
                                 General

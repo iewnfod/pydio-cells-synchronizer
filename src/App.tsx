@@ -14,7 +14,7 @@ import {Settings} from "./interfaces.ts";
 import {emit} from "@tauri-apps/api/event";
 
 function App() {
-    const [baseUrl, _setBaseUrl] = useState(getValueFromStorage(BASE_URL_STORAGE_KEY, ""));
+    const [baseUrl, _setBaseUrl] = useState(getValueFromStorage(BASE_URL_STORAGE_KEY, "demo.pydio.com"));
     const [urlPrefix, _setUrlPrefix] = useState(getValueFromStorage(URL_PREFIX_STORAGE_KEY, "https://"));
     const [fullUrl, setFullUrl] = useState<URL>(new URL(urlPrefix + baseUrl));
     const [settings, _setSettings] = useState<Settings>(
@@ -36,7 +36,7 @@ function App() {
 
     function setSettings(newSettings: Settings) {
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
-        emit("update-settings", JSON.stringify(settings)).then().catch();
+        emit("update-settings", settings).then().catch();
         _setSettings(newSettings);
     }
 
@@ -90,7 +90,7 @@ function App() {
                 style={{minHeight: '100vh', left: 0, top: 0, width: '100vw'}}
             >
                 <Grid xs={10}>
-                    <Box sx={{display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center"}}>
+                    <Box sx={{display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", overflow: 'hidden'}}>
                         <RouterProvider router={router}/>
                     </Box>
                 </Grid>

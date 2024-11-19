@@ -98,7 +98,7 @@ export default function EditTaskModalWithButton({
                     <DialogContent>
                         Change the information of the task.
                     </DialogContent>
-                    <DialogContent>
+                    <DialogContent sx={{overflowX: 'hidden'}}>
                         <Stack spacing={PAD2}>
                             <FormControl>
                                 {

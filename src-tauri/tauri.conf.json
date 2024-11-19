@@ -44,7 +44,8 @@
       "targets": "all",
       "identifier": "com.iewnfod.pydio.cells.synchronizer",
       "icon": [
-        "icons/icon.icns"
+        "icons/icon.icns",
+        "icons/icon.ico"
       ]
     }
   }

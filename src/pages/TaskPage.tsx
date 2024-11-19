@@ -4,11 +4,11 @@ import {
     ButtonGroup,
     Chip,
     IconButton,
-    LinearProgress,
     Sheet,
     Table,
     Typography
 } from "@mui/joy";
+import {LinearProgress} from "@mui/material";
 import {Settings, Task} from "../interfaces.ts";
 import {useEffect, useState} from "react";
 import {
@@ -29,6 +29,7 @@ import EditTaskModalWithButton from "../modals/EditTaskModal.tsx";
 import {callBackend, handleLogout} from "../Utils.ts";
 import React from "react";
 import SettingDrawerWithIconButton from "../modals/SettingDrawer.tsx";
+import "./TaskPage.css";
 
 export default function TaskPage({
     settings,
@@ -201,8 +202,8 @@ export default function TaskPage({
                     sx={{
                         pl: PAD, pr: PAD, pb: PAD,
                         '& tr > :last-child': { textAlign: 'right' },
-                        height: '100%'
                     }}
+                    className="task-table"
                 >
                     <thead>
                     <tr>
@@ -306,7 +307,7 @@ export default function TaskPage({
                                                 alignItems: 'center', gap: PAD
                                             }}>
                                                 <LinearProgress
-                                                    determinate
+                                                    variant="determinate"
                                                     value={progresses.get(task.uuid) || 0}
                                                     sx={{flexGrow: 1}}
                                                 />

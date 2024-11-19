@@ -15,6 +15,12 @@ use tauri::{
     SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem, WindowEvent,
 };
 
+#[cfg(target_os="macos")]
+const ACCELERATOR_PREFIX: &str = "Command";
+
+#[cfg(not(target_os="macos"))]
+const ACCELERATOR_PREFIX: &str = "Ctrl";
+
 fn main_loop(app_handle: &AppHandle, event: RunEvent) {
     match event {
         RunEvent::WindowEvent { label, event, .. } => match event {
@@ -42,9 +48,9 @@ fn main_loop(app_handle: &AppHandle, event: RunEvent) {
 
 fn build_tray() -> SystemTray {
     let tray_menu = SystemTrayMenu::new()
-        .add_item(CustomMenuItem::new("show".to_string(), "Show Window").accelerator("Command+S"))
+        .add_item(CustomMenuItem::new("show".to_string(), "Show Window").accelerator(format!("{}+S", ACCELERATOR_PREFIX)))
         .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(CustomMenuItem::new("quit".to_string(), "Quit").accelerator("Command+Q"));
+        .add_item(CustomMenuItem::new("quit".to_string(), "Quit").accelerator(format!("{}+Q", ACCELERATOR_PREFIX)));
 
     SystemTray::new().with_menu(tray_menu)
 }
@@ -61,12 +67,18 @@ fn tray_event(app_handle: &AppHandle, event: SystemTrayEvent) {
                 #[cfg(target_os = "macos")]
                 tauri::AppHandle::show(&window.app_handle()).unwrap();
 
-                #[cfg(target_os = "linux")]
+                #[cfg(not(target_os = "macos"))]
                 window.show().unwrap();
 
                 window.set_focus().unwrap();
             }
             _ => {}
+        },
+        #[cfg(target_os="windows")]
+        SystemTrayEvent::LeftClick { .. } => {
+            let window = app_handle.get_window("main").unwrap();
+            window.show().unwrap();
+            window.set_focus().unwrap();
         },
         _ => {}
     }
@@ -82,6 +94,10 @@ fn main() {
                 let new_settings: Settings = parse_json(data);
                 save_settings(new_settings);
             });
+
+            #[cfg(target_os="macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -103,10 +119,7 @@ fn main() {
             .on_system_tray_event(tray_event);
     }
 
-    let mut app = builder.build(tauri::generate_context!()).unwrap();
-
-    #[cfg(target_os="macos")]
-    app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+    let app = builder.build(tauri::generate_context!()).unwrap();
 
     app.run(main_loop);
 }
