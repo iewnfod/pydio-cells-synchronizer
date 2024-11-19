@@ -298,7 +298,11 @@ async fn _sync(
 
 			let partial_path = path.strip_prefix(&local_path).unwrap();
 			let partial_path_str = partial_path.as_os_str().to_str();
-			let s3_path = format!("{}/{}", &remote_path, partial_path_str.unwrap());
+			let mut to_path = partial_path_str.unwrap().to_string();
+			if cfg!(target_os="windows") {
+				to_path = to_path.replace("\\", "/");
+			}
+			let s3_path = format!("{}/{}", &remote_path, &to_path);
 
 			sync_tasks.push_back(SyncTask { from: path.to_path_buf(), to: s3_path.clone() });
 		}
@@ -310,8 +314,6 @@ async fn _sync(
 	'upload_loop: while let Some(sync_task) = sync_tasks.pop_front() {
 		let body = ByteStream::from_path(&sync_task.from).await;
 		if body.is_ok() {
-			println!("{:?}", &sync_task);
-
 			let this_node = post(
 				"/a/meta/bulk/get",
 				json!({
