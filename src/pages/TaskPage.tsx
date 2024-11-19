@@ -321,22 +321,29 @@ export default function TaskPage({
                             }
                         </React.Fragment>
                     ))}
+                    {
+                        tasks.length === 0 ? (
+                            <tr>
+                                <td colSpan={5}>
+                                    <Box sx={{
+                                        width: '100%', textAlign: 'center', gap: PAD, height: `${LARGE_PART}vh`,
+                                        display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center'
+                                    }}>
+                                        <Typography level="title-lg">
+                                            Try to add a new sync task!
+                                        </Typography>
+                                        <Button onClick={() => handleNewTask()}>
+                                            Create Task
+                                        </Button>
+                                    </Box>
+                                </td>
+                            </tr>
+                        ) : <></>
+                    }
                     </tbody>
                 </Table>
                 </Box>
             </Sheet>
-            <Box sx={{
-                width: '100%', height: '100%',
-                display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center'
-            }}>
-                {
-                    tasks.length === 0 ?
-                        <Typography level="title-lg">
-                            Try to add a new sync task!
-                        </Typography>
-                        : <></>
-                }
-            </Box>
             <CreateTaskModal
                 open={taskModalOpen}
                 setOpen={setTaskModalOpen}
