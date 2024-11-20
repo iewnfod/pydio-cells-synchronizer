@@ -312,29 +312,49 @@ async fn _sync(
 
 	let total = sync_tasks.len();
 
-	while sync_tasks.len() > 0 {
-		let semaphore = Semaphore::new(settings.uploadThreadNumber);
-		let new_tasks: Mutex<Vec<SyncTask>> = Mutex::new(vec![]);
+	// 创建线程池
+	static mut TASK_SEMA: Semaphore = Semaphore::const_new(8);
+	unsafe {
+		TASK_SEMA = Semaphore::new(settings.uploadThreadNumber);
+	}
 
-		for t in sync_tasks.clone() {
-			// 获取许可
-			let permit = semaphore.acquire().await.unwrap();
-			// 运行同步
-			let success = _sync_single(t.clone()).await;
-			if success {
-				let mut p = get_progress(uuid.clone(), total);
-				p.increase();
-				println!("{}/{}", p.current, p.total);
-				update_progress(&uuid, p);
-			} else {
-				let mut tasks = new_tasks.lock().unwrap();
-				tasks.push(t.clone());
+	while sync_tasks.len() > 0 {
+		static NEW_TASKS: Mutex<Vec<SyncTask>> = Mutex::new(vec![]);
+
+		for ti in 0..sync_tasks.len() {
+			unsafe {
+				// 获取许可
+				let permit = TASK_SEMA.acquire().await.unwrap();
+
+				let uuid_clone = uuid.clone();
+				let task_clone = sync_tasks[ti].clone();
+				let total_clone = total.clone();
+
+				let handler = tokio::spawn(async move {
+					// 运行同步
+					let success = _sync_single(task_clone.clone()).await;
+					if success {
+						let mut p = get_progress(uuid_clone.clone(), total_clone);
+						p.increase();
+						println!("{}/{}", p.current, p.total);
+						update_progress(&uuid_clone, p);
+					} else {
+						let mut tasks = NEW_TASKS.lock().unwrap();
+						tasks.push(task_clone.clone());
+					}
+					// 撤销许可
+					drop(permit);
+				});
+
+				// 如果是最后一个，就等待他完成
+				if ti == sync_tasks.len() - 1 {
+					handler.await.unwrap();
+				}
 			}
-			drop(permit);
 		}
 
 		sync_tasks.clear();
-		let tasks = new_tasks.lock().unwrap();
+		let tasks = NEW_TASKS.lock().unwrap();
 		for task in tasks.iter() {
 			sync_tasks.push_back(task.clone());
 		}
