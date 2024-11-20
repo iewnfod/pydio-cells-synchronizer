@@ -36,7 +36,7 @@ function App() {
 
     function setSettings(newSettings: Settings) {
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
-        emit("update-settings", settings).then().catch();
+        emit("update-settings", newSettings).then().catch();
         _setSettings(newSettings);
     }
 

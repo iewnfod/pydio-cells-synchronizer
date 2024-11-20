@@ -1,5 +1,6 @@
 use std::{fs::{create_dir_all, File, OpenOptions}, io::{Read, Write}, path::PathBuf, sync::Mutex};
 
+use auto_launch::AutoLaunchBuilder;
 use tauri::api::path::home_dir;
 use lazy_static::lazy_static;
 
@@ -37,6 +38,25 @@ pub fn get_saved_settings() -> Settings {
 }
 
 pub fn save_settings(new_settings: Settings) {
+	// check auto startup
+	let current_exe = std::env::current_exe().unwrap();
+	let auto = AutoLaunchBuilder::new()
+		.set_app_name("Pydio Cells Synchronizer")
+		.set_app_path(current_exe.as_os_str().to_str().unwrap())
+		.build().unwrap();
+
+	if new_settings.startWithLogin {
+		if !auto.is_enabled().unwrap() {
+			println!("Enable start at login");
+			auto.enable().unwrap();
+		}
+	} else {
+		if auto.is_enabled().unwrap() {
+			println!("Disable start at login");
+			auto.disable().unwrap();
+		}
+	}
+
 	// save to static
 	let mut settings = SETTINGS.lock().unwrap();
 	*settings = new_settings.clone();
@@ -57,9 +77,6 @@ pub fn save_settings(new_settings: Settings) {
 		.unwrap();
 
 	file.write_all(settings_string.as_bytes()).unwrap();
-	drop(file);
 
 	println!("Save settings to {:?}", &save_path);
-
-	// additional actions
 }

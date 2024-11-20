@@ -19,7 +19,7 @@ import IgnoresInput from "../components/IgnoresInput.tsx";
 
 const generalControls = [
     {
-        label: 'Start with login',
+        label: 'Start at login',
         property:'startWithLogin',
         restart: false
     },
