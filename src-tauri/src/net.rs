@@ -342,6 +342,8 @@ async fn _sync(
 						let mut tasks = NEW_TASKS.lock().unwrap();
 						tasks.push(task_clone.clone());
 					}
+					// 等待
+					sleep(Duration::from_millis(1000));
 					// 撤销许可
 					drop(permit);
 				});
