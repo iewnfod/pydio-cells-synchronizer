@@ -9,7 +9,7 @@ use surf::StatusCode;
 use tokio::{sync::Semaphore, task::JoinHandle};
 use walkdir::WalkDir;
 
-use crate::{data::get_saved_settings, etag::calculate_etag, structs::{parse_json, BulkMetaData, BulkNode, CommandResponse, SessionData, SyncTask, TaskData, TaskProgress, UserData}};
+use crate::{data::get_saved_settings, error::add_error, etag::calculate_etag, structs::{parse_json, BulkMetaData, BulkNode, CommandResponse, SessionData, SyncTask, TaskData, TaskProgress, UserData}};
 
 pub const PACKAGE_NAME: &str = "com.iewnfod.pydio.cells.synchronizer";
 const USERNAME_KEY: &str = "username";
@@ -437,12 +437,15 @@ async fn _sync_single(sync_task: SyncTask) -> bool {
 									refresh_login().await;
 								},
 								"NotImplemented" => {
-									println!("Invalid file {:?}", sync_task.from);
+									println!("Invalid file {:?}", &sync_task.from);
+									add_error(format!("Invalid file {:?}", &sync_task.from));
+									return true;
 								},
 								_ => {}
 							}
 						} else {
 							println!("Unknown error: {:?}", &se);
+							add_error(format!("Unknown error: {:?}", &se));
 						}
 					},
 					_ => {}
@@ -451,7 +454,9 @@ async fn _sync_single(sync_task: SyncTask) -> bool {
 			}
 		}
 	} else {
-		println!("Failed to read file: {:?}", &body.err());
+		let err = body.err();
+		println!("Failed to read file: {:?}", &err);
+		add_error(format!("Failed to read file: {:?}", &err));
 		return false;
 	}
 }

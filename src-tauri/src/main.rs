@@ -6,8 +6,10 @@ mod net;
 mod structs;
 mod etag;
 mod data;
+mod error;
 
 use data::{get_saved_settings, save_settings};
+use error::{get_errors, pop_error};
 use net::*;
 use structs::{parse_json, Settings};
 use tauri::{
@@ -111,7 +113,9 @@ async fn main() {
             get_username,
             get_password,
             set_username,
-            set_password
+            set_password,
+            get_errors,
+            pop_error
         ]);
 
     if settings.showTrayIcon {

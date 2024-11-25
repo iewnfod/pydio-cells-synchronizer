@@ -21,6 +21,9 @@
       },
       "dialog": {
         "all": true
+      },
+      "notification": {
+        "all": true
       }
     },
     "systemTray": {
